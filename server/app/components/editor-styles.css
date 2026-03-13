@@ -1,0 +1,16 @@
+/* editor-styles.css */
+
+/* Previous editable area highlight... */
+.editable-area-highlight {
+  background-color: rgba(46, 175, 46, 0.05); 
+}
+.editable-area-margin {
+  background-color: rgba(46, 175, 46, 0.1);
+  border-left: 3px solid #2eaf2e;
+}
+
+/* NEW: Dims the read-only text */
+.dimmed-text {
+  opacity: 0.1 !important; 
+  cursor: not-allowed !important;
+}

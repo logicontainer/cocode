@@ -101,7 +101,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_latest_question_by_code: {
+        Args: { p_code: number }
+        Returns: {
+          content: string
+          created_at: string
+          from_line: number
+          id: number
+          session_id: number
+          to_line: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "Question"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
       [_ in never]: never
