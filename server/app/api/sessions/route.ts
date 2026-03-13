@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 export async function POST() {
   const supabase = createClient(await cookies());
-  const code = randomInt(10000);
+  const code = randomInt(1000, 10000);
 
   const { error, data } = await supabase
     .from("Session")
