@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import { QuestionManager } from './questions';
 
 import {StartSessionViewProvider, MyPanelViewProvider} from './viewproviders';
+import { Session } from './types';
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("CoCode started");
@@ -23,7 +24,7 @@ export function activate(context: vscode.ExtensionContext) {
   const htmlPath = path.join(context.extensionPath, 'media', 'view.html');
   const provider = new MyPanelViewProvider(htmlPath);
 
-  const questionManager = new QuestionManager(provider);
+  const questionManager = new QuestionManager(provider, context);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('cocodeAnswers', provider)
@@ -56,11 +57,16 @@ export function activate(context: vscode.ExtensionContext) {
   
   // register command to start a new  session
   context.subscriptions.push(
-    vscode.commands.registerCommand('cocode.startSession', () => {
+    vscode.commands.registerCommand('cocode.startSession', async () => {
       // call end point to get code, and sessionid
-      const sessionId = 12345678;
-      const sessionCode = 4321;
-
+      const result = await fetch('http://localhost:3000/api/sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      const { id: sessionId, code: sessionCode } = await result.json() as Session;
+      console.log(sessionId, sessionCode);
       joinSession(sessionId, sessionCode);
     })
   );
@@ -74,18 +80,10 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      vscode.workspace.onDidChangeTextDocument((event) => {
-        
-      })
+      const selection = editor.selection;
+      const content = editor.document.getText();
+      await questionManager.startQuestion(selection, content);
 
-      const uri = editor.document.uri;
-      const fileName = uri.fsPath.split('/').pop();
-
-      // Lock the file as readonly in this session
-      await vscode.commands.executeCommand(
-        'workbench.action.files.setActiveEditorReadonlyInSession'
-      );
-      vscode.window.showInformationMessage(`${fileName} is now read-only.`);
     })
   );
 
