@@ -12,28 +12,56 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsWelcome": [
+      {
+        "view": "cocodeCreateSession",
+        "contents": "[Start Session](command:cocode.startSession)"
+      },
+      {
+        "view": "cocodeCreateSession",
+        "contents": "\n[Rejoin Previous Session](command:cocode.rejoinSession)",
+        "when": "cocode.showRejoin&&!cocode.inSession"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
           "id": "cocode",
           "title": "CoCode",
-          "icon": "https://commons.wikimedia.org/wiki/File:Apple_logo_black.svg"
+          "icon": "resources/icon-cocode.svg"
         }
       ]
     },
     "views": {
       "cocode": [
         {
-          "id": "cocodeView",
-          "name": "CoCode View"
+          "id": "cocodeCreateSession",
+          "name": "Create Session",
+          "type": "tree",
+          "when": "!cocode.inSession"
+        },
+        {
+          "id": "cocodeAnswers",
+          "name": "Answers",
+          "type": "webview",
+          "when": "cocode.inSession"
         }
       ]
     },
     "commands": [
       {
-        "command": "cocode.helloWorld",
-        "title": "Hello World"
+        "command": "cocode.startSession",
+        "title": "Start New Session"
+      },
+      {
+        "command": "cocode.rejoinSession",
+        "title": "Rejoin Previous Session"
+      },
+      {
+        "command": "cocode.postQuestion",
+        "title": "Post Question"
       }
+
     ]
   },
   "scripts": {
