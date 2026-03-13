@@ -1,0 +1,52 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<style>
+    body {
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    input {
+        width: 100%;
+        background: var(--vscode-input-background);
+        color: var(--vscode-input-foreground);
+        border: 1px solid var(--vscode-input-border);
+        padding: 4px 6px;
+        box-sizing: border-box;
+    }
+    button {
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+        border: none;
+        padding: 6px;
+        cursor: pointer;
+        width: 100%;
+    }
+    button:hover {
+        background: var(--vscode-button-hoverBackground);
+    }
+    #session-code {
+        color: var(--vscode-descriptionForeground);
+        font-size: 12px;
+    }
+</style>
+</head>
+<body>
+    <label id="session-code">Session code: </label>
+<script>
+    const vscode = acquireVsCodeApi();
+
+
+    // Listen for label updates from the extension
+    window.addEventListener('message', (event) => {
+        const { command, text } = event.data;
+        if (command === 'updateLabel') {
+            document.getElementById('session-code').textContent = text;
+        }
+    });
+</script>
+</body>
+</html>
