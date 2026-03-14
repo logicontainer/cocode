@@ -6,11 +6,7 @@ import { QuestionManager } from './questions';
 
 import { StartSessionViewProvider } from './providers/start-provider';
 import { AnswerViewProvider } from './providers/answer-provider';
-<<<<<<< HEAD
 import { Answer, Question, QuestionPostResult, Session } from './types';
-=======
-import { Answer, Session } from './types';
->>>>>>> origin/main
 
 const ANSWER_POLL_TIMEOUT = 5000;
 
@@ -49,7 +45,6 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   const provider = new AnswerViewProvider(answerViewPath, context.extensionUri, onChooseAnswerInPanel);
-<<<<<<< HEAD
   const apiPostQuestion = async (question: Omit<Question, "id">) => {
     const sessionId = context.workspaceState.get("cocodeSessionId", null);
     const res = await fetch(`http://localhost:3000/api/sessions/${sessionId}/questions`, {
@@ -63,9 +58,6 @@ export function activate(context: vscode.ExtensionContext) {
   }
   
   const questionManager = new QuestionManager(apiPostQuestion);
-=======
-  const questionManager = new QuestionManager(provider, context);
->>>>>>> origin/main
 
   const apiPollAnswers = async () => {
     const sessionId = context.workspaceState.get("cocodeSessionId", null);

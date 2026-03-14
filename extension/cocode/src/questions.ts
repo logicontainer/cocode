@@ -46,19 +46,10 @@ export class QuestionManager {
     private activeQuestionId: number | null;
     private activeRange: DynamicRange | null;
     private activeEditor: vscode.TextEditor | null;
-<<<<<<< HEAD
-=======
-    private provider: AnswerViewProvider;
-    private context: vscode.ExtensionContext;
->>>>>>> origin/main
     private decorationHandler: DecorationHandler;
     private apiPostQuestion: (question: Omit<Question, "id">) => Promise<QuestionPostResult>
 
-<<<<<<< HEAD
     constructor(apiPostQuestion: (question: Omit<Question, "id">) => Promise<QuestionPostResult>) {
-=======
-    constructor(provider:AnswerViewProvider, context: vscode.ExtensionContext) {
->>>>>>> origin/main
         this.activeRange = null;
         this.activeQuestionId = null;
         this.activeEditor = null;
