@@ -118,18 +118,28 @@
         color: var(--vscode-list-activeSelectionForeground);
     }
 
-    .center {
+    .centered {
         width: 100%;
         text-align: center;
+        padding-bottom: 12px;
+    }
+
+    .centered * {
+        padding: 0px;
+        margin: 0px;
     }
 
 </style>
 <link href="{{CODEICONS_URI_MAGICAL_STRING}}" rel="stylesheet"/>
 </head>
 <body>
-    <h2 class="center">Session code:<br/>
-    <a id="session-code-value"></a><br/>
-    Join at: cocode.kasperskov.dev</h2>
+    <div class="centered">
+        <p>Go to</p>
+        <h2>cocode.kasperskov.dev</h2>
+        <div style="height:12px"></div>
+        <p>Enter the code</p>
+        <h1><a id="session-code-value"></a></h1>
+    </div>
     <button id="post-question-btn">Collaborate on selection</button>
     <button id="accept-answer-btn" disabled>Accept suggestion</button>
     <button id="reject-answer-btn">Reject suggestions</button>
