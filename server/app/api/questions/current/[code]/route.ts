@@ -7,7 +7,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
   const { code: codeString } = await params
   const code = parseInt(codeString)
 
-
   const { error, data } = await supabase.rpc("get_latest_question_by_code", { p_code: code }).select("id")
   if (error !== null) {
     console.error("Supabase error", error)
