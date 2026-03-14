@@ -57,7 +57,7 @@ export async function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    const idx = answers.findIndex((a) => a.id == id);
+    const idx = answers.findIndex((a) => a.id === id);
     if (idx === -1) {
       vscode.window.showErrorMessage(`Answer with id ${id} doesn't exist.`);
       return;
@@ -65,7 +65,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const answer = answers[idx]
     //vscode.window.showInformationMessage(`Chose answer ${answer}`);
     questionManager.chooseAnswer(answer)
-  }
+  };
 
 
   const provider = new AnswerViewProvider(answerViewPath, context.extensionUri, onChooseAnswerInPanel);
@@ -132,7 +132,7 @@ export async function activate(context: vscode.ExtensionContext) {
     await context.workspaceState.update("cocodeSessionCode", sessionCode);
 
     provider.updateSessionCode(sessionCode);
-    provider.updateAnswers([])
+    provider.updateAnswers([]);
   };
 
   // register command to rejoin previous session
@@ -195,18 +195,13 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('cocode.closeQuestion', async () => {
       if (!sessionJoined) {
-        vscode.window.showWarningMessage('No active session')
+        vscode.window.showWarningMessage('No active session');
         return;
       }
  
-      if (questionManager.getActiveQuestion() === null) {
-        vscode.window.showWarningMessage('No active question to end.')
-        return;
-      }
-
-      questionManager.endQuestion()
+      questionManager.endQuestion();
       answers = [];
-      provider.updateQuestion(questionManager.getActiveQuestion())
+      provider.updateQuestion(null);
       provider.updateAnswers([]);
     })
   );
