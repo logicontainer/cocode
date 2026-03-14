@@ -22,6 +22,8 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp"
 import { useRouter } from "next/navigation"
+import { useState } from "react"
+import { Spinner } from "@/components/ui/spinner"
 
 const FormSchema = z.object({
   code: z.string().min(4).max(4),
@@ -29,6 +31,7 @@ const FormSchema = z.object({
 
 export default function InputOTPForm() {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -38,6 +41,7 @@ export default function InputOTPForm() {
   })
 
   function onSubmit(data: z.infer<typeof FormSchema>) {
+    setIsLoading(true)
     router.push(`/answer?code=${data.code}`);
   }
 
@@ -48,7 +52,7 @@ export default function InputOTPForm() {
       </div>
       <div className="space-y-6 border-zinc-100 bg-white border p-4 rounded-lg flex-col justify-center items-center shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
 
-        <p className="text-xl font-bold text-center mb-2">Join a Session</p>
+        <p className="text-xl font-bold text-center mb-2 text-slate-800">Join a Session</p>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <FormField
@@ -67,13 +71,13 @@ export default function InputOTPForm() {
                     </InputOTP>
                   </FormControl>
                   <FormDescription>
-                    Please enter the code from the presenter
+                    Enter the code to join
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" className="flex justify-center w-full mt-4 bg-green-600 rounded-full">Submit</Button>
+            <Button type="submit" className="flex justify-center w-full mt-4 bg-slate-800 rounded-full" disabled={isLoading}>{isLoading ? <Spinner /> : "Join"}</Button>
           </form>
         </Form>
       </div>
