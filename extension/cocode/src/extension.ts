@@ -193,12 +193,16 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('cocode.acceptAnswer', async () => {
+    vscode.commands.registerCommand('cocode.acceptSuggestion', async () => {
       if (!sessionJoined) {
         vscode.window.showWarningMessage('No active session');
         return;
       }
- 
+      if (provider.getChosenAnswerId() === null) {
+        vscode.window.showWarningMessage('No suggestion chosen');
+        return;
+      }
+
       questionManager.endQuestion();
       answers = [];
       provider.updateQuestion(null);
@@ -207,7 +211,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('cocode.rejectAnswer', async () => {
+    vscode.commands.registerCommand('cocode.rejectSuggestions', async () => {
       if (!sessionJoined) {
         vscode.window.showWarningMessage('No active session');
         return;

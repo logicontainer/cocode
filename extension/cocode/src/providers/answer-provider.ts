@@ -39,10 +39,10 @@ export class AnswerViewProvider implements vscode.WebviewViewProvider {
       } else if (message.command === 'chooseAnswer') {
         this.chosenAnswerId = message.id;
         this.onChooseAnswer(message.id)
-      } else if (message.command === 'acceptAnswer') {
-        vscode.commands.executeCommand('cocode.acceptAnswer');
-      } else if (message.command === 'rejectAnswer') {
-        vscode.commands.executeCommand('cocode.rejectAnswer');
+      } else if (message.command === 'acceptSuggestion') {
+        vscode.commands.executeCommand('cocode.acceptSuggestion');
+      } else if (message.command === 'rejectSuggestions') {
+        vscode.commands.executeCommand('cocode.rejectSuggestions');
       }
     });
 

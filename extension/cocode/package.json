@@ -51,12 +51,12 @@
         "title": "CoCode: Post Question"
       },
       {
-        "command": "cocode.acceptAnswer",
-        "title": "CoCode: Accept Answer"
+        "command": "cocode.acceptSuggestion",
+        "title": "CoCode: Accept Suggestion"
       },
       {
-        "command": "cocode.rejectAnswer",
-        "title": "CoCode: Reject Answer"
+        "command": "cocode.rejectSuggestions",
+        "title": "CoCode: Reject Suggestions"
       }
     ],
     "menus": {

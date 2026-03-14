@@ -174,12 +174,12 @@
 
     document.getElementById('accept-answer-btn')
             .addEventListener('click', () => {
-        vscode.postMessage({ command: 'acceptAnswer' });
+        vscode.postMessage({ command: 'acceptSuggestion' });
     });
 
     document.getElementById('reject-answer-btn')
             .addEventListener('click', () => {
-        vscode.postMessage({ command: 'rejectAnswer' });
+        vscode.postMessage({ command: 'rejectSuggestions' });
     });
 
     // Listen for label updates from the extension
