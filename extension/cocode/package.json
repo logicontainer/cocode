@@ -61,8 +61,17 @@
         "command": "cocode.postQuestion",
         "title": "Post Question"
       }
-    ]
-  },
+    ],
+    "menus": {
+      "editor/context": [
+          {
+            "command": "cocode.postQuestion",
+            "group": "CoCode",
+            "when": "editorTextFocus"
+          }
+        ]
+      }
+},
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",

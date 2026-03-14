@@ -47,6 +47,8 @@ export function activate(context: vscode.ExtensionContext) {
       const sessionId = context.workspaceState.get("cocodeSessionId", null);
       const sessionCode = context.workspaceState.get("cocodeSessionCode", null);
 
+
+
       if (sessionId && sessionCode) {
         joinSession(sessionId, sessionCode);
       } else {
@@ -80,9 +82,7 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      const selection = editor.selection;
-      const content = editor.document.getText();
-      await questionManager.startQuestion(selection, content);
+      await questionManager.startQuestion(editor);
 
     })
   );
