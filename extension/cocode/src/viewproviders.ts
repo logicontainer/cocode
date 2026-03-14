@@ -11,15 +11,18 @@ export class StartSessionViewProvider implements vscode.WebviewViewProvider {
   constructor(htmlPath: string, sessionCode: number | null) {
     this.html = fs.readFileSync(htmlPath, 'utf-8');
     this.sessionCode = sessionCode;
-  }
+  }  
 
   resolveWebviewView(webviewView: vscode.WebviewView) {
     this._view = webviewView;
 
+    console.log(`Session code: ${this.sessionCode}`);
+
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = this._getHtml();
 
-    webviewView.webview.postMessage({ command: 'setSessionCode', text: this.sessionCode });
+    webviewView.onDidChangeVisibility(() => this.sendSessionCodeToWebview());
+    this.sendSessionCodeToWebview();
 
     // Handle messages sent from the webview
     webviewView.webview.onDidReceiveMessage((message) => {
@@ -32,6 +35,12 @@ export class StartSessionViewProvider implements vscode.WebviewViewProvider {
       }
     });
     
+  }
+
+  private sendSessionCodeToWebview(): void {
+    if (this._view) {
+      this._view.webview.postMessage({ command: 'setSessionCode', text: this.sessionCode });
+    } 
   }
 
   private _getHtml(): string {

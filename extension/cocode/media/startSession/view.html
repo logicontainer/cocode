@@ -3,7 +3,7 @@
 <head>
 <style>
     body {
-        padding: 8px;
+        padding: 16px;
         display: flex;
         flex-direction: column;
         gap: 6px;
@@ -21,23 +21,29 @@
         color: var(--vscode-button-foreground);
         border: none;
         padding: 6px;
+        border-radius: 4px;
         cursor: pointer;
         width: 100%;
     }
     button:hover {
         background: var(--vscode-button-hoverBackground);
     }
-    #session-code {
-        color: var(--vscode-descriptionForeground);
-        font-size: 12px;
+    #session-code-value {
+        font-weight: bold;
     }
 </style>
 </head>
 <body>
-    <h3>To create a new session press the button</h3>
-    <button id="start-session-btn">Start Session</button>
+    <p>
+        Start a new live coding session to post questions, 
+        and receive answers. Students can write answers 
+        <a href="https://cocode.kasperskov.dev">here</a>!
+    </p>
+    <button id="start-session-btn">Create Session</button>
     <div id="session-code" style="display: none;">
-        <h3 id="session-code-text">Found existing session with code: </h3>
+        <p id="session-code-text">Found existing session with code: 
+            <span id="session-code-value"></span>
+        </p>
         <button id="rejoin-session-btn">Rejoin Session</button>
     </div>
 <script>
@@ -47,7 +53,7 @@
         const { command, text } = event.data;
         if (command === 'setSessionCode') {
             document.getElementById('session-code').style.display = 'block';
-            document.getElementById('session-code-text').textContent = `Found existing session with code: ${text}`;
+            document.getElementById('session-code-value').textContent = text;
         }
     });
 

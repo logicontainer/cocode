@@ -23,7 +23,6 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewViewProvider('cocodeCreateSession', startSessionProvider)
   );
 
-
   const htmlPath = path.join(context.extensionPath, 'media', 'view.html');
   const provider = new MyPanelViewProvider(htmlPath, context.extensionUri);
 
