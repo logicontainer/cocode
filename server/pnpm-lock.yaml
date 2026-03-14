@@ -62,15 +62,12 @@ importers:
       supabase-js:
         specifier: 0.0.1-security
         version: 0.0.1-security
-<<<<<<< Updated upstream
-=======
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
->>>>>>> Stashed changes
       zod:
         specifier: ^4.3.6
         version: 4.3.6
