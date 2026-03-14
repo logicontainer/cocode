@@ -1,6 +1,6 @@
 import { assert } from "console";
 import { Answer, Question, QuestionPostResult } from "./types";
-import { MyPanelViewProvider } from "./viewproviders";
+import { AnswerViewProvider } from "./providers/answer-provider";
 import * as vscode from 'vscode';
 const { getUpdatedRanges } = require('vscode-position-tracking')
 
@@ -9,11 +9,11 @@ export class QuestionManager {
     private activeQuestionId: number | null;
     private activeRange: vscode.Range | null;
     private activeEditor: vscode.TextEditor | null;
-    private provider: MyPanelViewProvider;
+    private provider: AnswerViewProvider;
     private context: vscode.ExtensionContext;
     private decorationHandler: DecorationHandler;
 
-    constructor(provider:MyPanelViewProvider, context: vscode.ExtensionContext) {
+    constructor(provider:AnswerViewProvider, context: vscode.ExtensionContext) {
         this.activeRange = null;
         this.activeQuestionId = null;
         this.activeEditor = null;
