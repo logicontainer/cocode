@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/default.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
 
 <!-- and it's easy to individually load additional languages -->
@@ -23,6 +23,7 @@
         color: var(--vscode-button-foreground);
         border: none;
         padding: 6px;
+        border-radius: 4px;
         cursor: pointer;
         width: 100%;
     }
@@ -96,6 +97,7 @@
 </head>
 <body>
     <h2>Session code: <a id="session-code-value"></a></h2>
+    <button id="post-question-btn">Post Question</button>
 
     <div id="answer-container">
         
@@ -129,6 +131,11 @@
         vscode.postMessage({ command: 'chooseAnswer', id: answers[chosenIdx].id })
     }
 
+    document.getElementById('post-question-btn')
+            .addEventListener('click', () => {
+        vscode.postMessage({ command: 'postQuestion' });
+    });
+
     // Listen for label updates from the extension
     window.addEventListener('message', (event) => {
         vscode.postMessage({
@@ -139,7 +146,7 @@
         if (event.data.command === 'setSessionCode') {
             const element = document.getElementById('session-code-value');
             element.textContent = event.data.text;
-            element.href = `https://cocode.kasperskov.dev/answers?code=${event.data.text}`;
+            element.href = `https://cocode.kasperskov.dev/answer?code=${event.data.text}`;
 
         } else if (event.data.command === "updateAnswers") {
             answers = event.data.answers

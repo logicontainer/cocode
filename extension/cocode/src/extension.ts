@@ -4,8 +4,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { QuestionManager } from './questions';
 
-import {StartSessionViewProvider, MyPanelViewProvider} from './viewproviders';
-import { Answer, Session } from './types';
+import { StartSessionViewProvider } from './providers/start-provider';
+import { AnswerViewProvider } from './providers/answer-provider';
+import { Answer, Question, QuestionPostResult, Session } from './types';
 
 const ANSWER_POLL_TIMEOUT = 5000;
 
@@ -18,15 +19,14 @@ export function activate(context: vscode.ExtensionContext) {
   const oldSessionExists = previousId !== null && previousCode !== null;
   vscode.commands.executeCommand('setContext', 'cocode.showRejoin', oldSessionExists); 
 
-  const startSessionPath = path.join(context.extensionPath, 'media', 'startSession', 'view.html');
-  const startSessionProvider = new StartSessionViewProvider(startSessionPath, oldSessionExists ? previousCode : null);
+  const startViewPath = path.join(context.extensionPath, 'media', 'startView.html');
+  const startSessionProvider = new StartSessionViewProvider(startViewPath, oldSessionExists ? previousCode : null);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('cocodeCreateSession', startSessionProvider)
   );
 
-  const htmlPath = path.join(context.extensionPath, 'media', 'view.html');
-
+  const answerViewPath = path.join(context.extensionPath, 'media', 'answerView.html');
 
   let answers: Answer[] = []
   const onChooseAnswerInPanel = (id: number) => {
@@ -40,12 +40,23 @@ export function activate(context: vscode.ExtensionContext) {
     questionManager.chooseAnswer(answer)
   }
 
-  const provider = new MyPanelViewProvider(htmlPath, context.extensionUri, onChooseAnswerInPanel);
-  const questionManager = new QuestionManager(provider, context);
+  const provider = new AnswerViewProvider(answerViewPath, context.extensionUri, onChooseAnswerInPanel);
+  const apiPostQuestion = async (question: Omit<Question, "id">) => {
+    const sessionId = context.workspaceState.get("cocodeSessionId", null);
+    const res = await fetch(`http://localhost:3000/api/sessions/${sessionId}/questions`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(question)
+    });
+    return (await res.json()) as QuestionPostResult
+  }
+  
+  const questionManager = new QuestionManager(apiPostQuestion);
 
-
-  const pollAnswers = async () => {
-    const sessionId = await context.workspaceState.get("cocodeSessionId", null);
+  const apiPollAnswers = async () => {
+    const sessionId = context.workspaceState.get("cocodeSessionId", null);
     const questionId = questionManager.getActiveQuestionId()
 
     if (!sessionId || !questionId) {
@@ -57,7 +68,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     provider.updateAnswers(answers)
   }
-  setInterval(pollAnswers, ANSWER_POLL_TIMEOUT)
+  
+  setInterval(apiPollAnswers, ANSWER_POLL_TIMEOUT)
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('cocodeAnswers', provider)
@@ -71,7 +83,7 @@ export function activate(context: vscode.ExtensionContext) {
     await context.workspaceState.update("cocodeSessionCode", sessionCode);
     
     provider.updateSessionCode(sessionCode);
-    provider.updateAnswers([{ id: 1, text: "for (let i = 0; i < array.length; i++) return true;" }])
+    provider.updateAnswers([])
   };
 
   // register command to rejoin previous session
