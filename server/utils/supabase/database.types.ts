@@ -104,6 +104,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_answer: {
+        Args: { aid_param: number; qid_param: number; sid_param: number }
+        Returns: {
+          created_at: string
+          id: number
+          question_id: number
+          text: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "Answer"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_latest_question_by_code: {
         Args: { p_code: number }
         Returns: {
