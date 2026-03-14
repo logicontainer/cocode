@@ -45,7 +45,7 @@ export default function Answer({ code, question }: { code: number, question: Dat
     <>
       <Menubar code={code} submitting={submitting} onSubmit={handleSubmit} onReset={handleReset} hasChanges={hasChanges} canSubmit={canSubmit} />
       <div className="flex items-center justify-center p-5 md:p-10 md:pt-5 h-[calc(100vh-65px)]">
-        <div className="border border-zinc-100 rounded-lg w-full h-full overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.08)] bg-white">
+        <div className="border border-zinc-100 rounded-lg w-full h-full shadow-[0_8px_30px_rgb(0,0,0,0.08)] bg-white">
           {question ?
             <IDE key={resetKey} question={question} onChangeUserAnswer={setUserAnswer} /> :
             <div className="w-full h-full flex justify-center items-center">Waiting for the presenter to post a question ...</div>
