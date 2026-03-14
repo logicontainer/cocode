@@ -2,11 +2,11 @@ import { Answer, answerNoIdSchema } from "@/types/api";
 import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { parse } from "path";
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: number }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = createClient(await cookies());
-  const { id } = await params
+  const { id: idString } = await params
+  const id = parseInt(idString)
 
   const parseResult = answerNoIdSchema.safeParse(await req.json())
   if (!parseResult.success) {
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       question_id: id,
       text: answer.text
     })
-    
+
   if (error !== null) {
     console.error("Supabase error", error)
     return NextResponse.json(error, { status: 500 });

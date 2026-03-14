@@ -2,8 +2,9 @@ import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(_: NextRequest, { params }: { params: Promise<{ id: number }> }) {
-  const { id } = await params
+export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idString } = await params
+  const id = parseInt(idString)
   const supabase = createClient(await cookies());
 
   const { error, data } = await supabase

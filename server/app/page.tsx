@@ -40,36 +40,38 @@ export default function InputOTPForm() {
   }
 
   return (
-    <div className="w-full h-screen flex justify-center items-center bg-gray-100">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="w-2/3 space-y-6 border-gray-200 bg-white border p-4 rounded-md flex-col justify-center items-center">
-          <FormField
-            control={form.control}
-            name="code"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Join session</FormLabel>
-                <FormControl>
-                  {/* 4. Connect the InputOTP component to the form field */}
-                  <InputOTP autoFocus maxLength={4} {...field}>
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </FormControl>
-                <FormDescription>
-                  Please enter the code from the presenter
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <Button type="submit" className="cursor-pointer">Submit</Button>
-        </form>
-      </Form>
+    <div className="w-full h-screen flex justify-center items-center">
+      <div className="space-y-6 border-gray-200 bg-white border p-4 rounded-lg flex-col justify-center items-center shadow-md">
+        <p className="text-lg text-center">Join a Session</p>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem className="flex flex-col justify-center items-center w-full">
+                  <FormControl>
+                    {/* 4. Connect the InputOTP component to the form field */}
+                    <InputOTP autoFocus maxLength={4} {...field}>
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </FormControl>
+                  <FormDescription>
+                    Please enter the code from the presenter
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" className="flex justify-center w-full mt-4 cursor-pointer">Submit</Button>
+          </form>
+        </Form>
+      </div>
     </div>
 
   )

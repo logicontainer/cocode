@@ -4,9 +4,11 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import z from "zod";
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ sid: number }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ sid: string }> }) {
   const supabase = createClient(await cookies());
-  const { sid: sessionId } = await params
+  const { sid: sidString } = await params
+  const sessionId = parseInt(sidString)
+
 
   const parseResult = questionNoIdSchema.safeParse(await req.json().catch(() => null))
   if (!parseResult.success) {
