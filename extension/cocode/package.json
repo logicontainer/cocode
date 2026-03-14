@@ -51,8 +51,12 @@
         "title": "CoCode: Post Question"
       },
       {
-        "command": "cocode.closeQuestion",
-        "title": "CoCode: Close Question"
+        "command": "cocode.acceptAnswer",
+        "title": "CoCode: Accept Answer"
+      },
+      {
+        "command": "cocode.rejectAnswer",
+        "title": "CoCode: Reject Answer"
       }
     ],
     "menus": {

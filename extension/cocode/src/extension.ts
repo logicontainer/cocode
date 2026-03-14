@@ -193,12 +193,26 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('cocode.closeQuestion', async () => {
+    vscode.commands.registerCommand('cocode.acceptAnswer', async () => {
       if (!sessionJoined) {
         vscode.window.showWarningMessage('No active session');
         return;
       }
  
+      questionManager.endQuestion();
+      answers = [];
+      provider.updateQuestion(null);
+      provider.updateAnswers([]);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('cocode.rejectAnswer', async () => {
+      if (!sessionJoined) {
+        vscode.window.showWarningMessage('No active session');
+        return;
+      }
+      await questionManager.chooseAnswer(null);
       questionManager.endQuestion();
       answers = [];
       provider.updateQuestion(null);

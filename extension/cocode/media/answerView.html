@@ -112,9 +112,10 @@
     <h2 class="center">Session code:<br/>
     <a id="session-code-value"></a><br/>
     Join at: cocode.kasperskov.dev</h2>
-    <button id="post-question-btn">Post Question</button>
-    <button id="close-question-btn">Close question</button>
-    <h2 id="answers-header" style="margin-bottom: 0px">Answers: <span id="answer-count">0</span></h2>
+    <button id="post-question-btn">Collaborate on selection</button>
+    <button id="accept-answer-btn" disabled>Accept suggestion</button>
+    <button id="reject-answer-btn">Reject suggestions</button>
+    <h2 id="answers-header" style="margin-bottom: 0px">Suggestions: <span id="answer-count">0</span></h2>
     <div id="answer-container"></div>
 
 
@@ -140,7 +141,8 @@
         currentQuestionId = id
         currentQuestionLanguage = language 
         document.querySelector('#post-question-btn').disabled = currentQuestionId !== null
-        document.querySelector('#close-question-btn').disabled = currentQuestionId === null
+        document.querySelector('#accept-answer-btn').disabled = currentQuestionId === null || chosenAnswerId === null
+        document.querySelector('#reject-answer-btn').disabled = currentQuestionId === null
         document.querySelector('#answers-header').hidden = currentQuestionId === null
     }
 
@@ -154,6 +156,7 @@
                 elm.classList.remove('chosen');
             }
         });
+        document.querySelector('#accept-answer-btn').disabled = chosenAnswerId === null
     }
 
     function chooseAnswer(id) {
@@ -169,9 +172,14 @@
         vscode.postMessage({ command: 'postQuestion' });
     });
 
-    document.getElementById('close-question-btn')
+    document.getElementById('accept-answer-btn')
             .addEventListener('click', () => {
-        vscode.postMessage({ command: 'closeQuestion' });
+        vscode.postMessage({ command: 'acceptAnswer' });
+    });
+
+    document.getElementById('reject-answer-btn')
+            .addEventListener('click', () => {
+        vscode.postMessage({ command: 'rejectAnswer' });
     });
 
     // Listen for label updates from the extension

@@ -141,7 +141,7 @@ export class QuestionManager {
             editor = await vscode.window.showTextDocument(this.state.document, { selection: range });
         }
 
-        editor.edit(editBuilder => {
+        await editor.edit(editBuilder => {
             if (!this.state) {
                 vscode.window.showErrorMessage("No question has been asked")
                 return;
@@ -151,6 +151,8 @@ export class QuestionManager {
 
             editBuilder.replace(range, replacement);
         }).then(success => {
+            console.log("Edit success: ", success);
+            console.log("State", this.state);
             if (success && this.state) {       
                 const lines = replacement.split(/\r?\n/);
                 const lineCount = lines.length;
