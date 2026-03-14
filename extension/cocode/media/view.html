@@ -115,15 +115,19 @@
 <script>
     const vscode = acquireVsCodeApi();
 
+    let answers = []
     let chosenIdx = -1;
-    const answerContainer = document.getElementById('answer-container');
 
     function chooseAnswer(idx) {
+        const container = document.querySelector('#answer-container')
         if (chosenIdx !== -1) {
-            answerContainer.children[chosenIdx].classList.remove('chosen')
+            container.children[chosenIdx].classList.remove('chosen')
         }
-        answerContainer.children[idx].classList.add('chosen')
+
+        container.children[idx].classList.add('chosen')
         chosenIdx = idx
+
+        vscode.postMessage({ command: 'chooseAnswer', id: answers[chosenIdx].id })
     }
 
     // Listen for label updates from the extension
@@ -136,23 +140,18 @@
         if (event.data.command === 'updateLabel') {
             document.getElementById('session-code').textContent = event.data.text;
         } else if (event.data.command === "updateAnswers") {
-            answerContainer.innerHTML = ""
-            const elements = event.data.answers.forEach((answer, idx) => {
+            answers = event.data.answers
+        
+            const elements = event.data.answers.map((answer, idx) => {
                 const elm = document.querySelector('#answer-template').content.firstElementChild.cloneNode(true)
                 elm.querySelector('.answer-code').textContent = answer.text
-
                 elm.addEventListener('click', () => chooseAnswer(idx))
-
-                answerContainer.appendChild(elm)
+                return elm
             })
-            // .map(
-            //    ({ text }) => {
-            //        vscode.postMessage({
-            //            command: 'debug',
-            //            msg: JSON.stringify(answer)
-            //        })
-            //    }
-            //)
+            
+            const container = document.querySelector('#answer-container')
+            elements.innerHTML = ""
+            elements.forEach(elm => container.appendChild(elm))
         }
     });
 </script>
