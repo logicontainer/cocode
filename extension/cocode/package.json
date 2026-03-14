@@ -40,15 +40,19 @@
     "commands": [
       {
         "command": "cocode.startSession",
-        "title": "Start New Session"
+        "title": "CoCode: Start New Session"
       },
       {
         "command": "cocode.rejoinSession",
-        "title": "Rejoin Previous Session"
+        "title": "CoCode: Rejoin Previous Session"
       },
       {
         "command": "cocode.postQuestion",
-        "title": "Post Question"
+        "title": "CoCode: Post Question"
+      },
+      {
+        "command": "cocode.closeQuestion",
+        "title": "CoCode: Close Question"
       }
     ],
     "menus": {

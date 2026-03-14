@@ -134,22 +134,24 @@
         document.querySelector('h3').hidden = currentQuestionId === null
     }
 
-    function chooseAnswer(id) {
-        const container = document.querySelector('#answer-container')
-        if (chosenAnswerId !== null) {
-            const child = Array.from(container.children).find(elm => elm.id === `answer-${chosenAnswerId}`)
-            child.classList.remove('chosen')
-        }
+    function updateChosenAnswer(id) {
+        chosenAnswerId = id;
+        const answerElements = document.querySelectorAll('.answer');
+        answerElements.forEach(elm => {
+            if (chosenAnswerId !== null && elm.id === `answer-${chosenAnswerId}`) {
+                elm.classList.add('chosen');
+            } else {
+                elm.classList.remove('chosen');
+            }
+        });
+    }
 
-        if (chosenAnswerId !== id) {
-            const child = Array.from(container.children).find(elm => elm.id === `answer-${id}`)
-            child.classList.add('chosen')
-            chosenAnswerId = id
-            vscode.postMessage({ command: 'chooseAnswer', id })
-        } else {
-            chosenAnswerId = null
-            vscode.postMessage({ command: 'chooseAnswer', id: null })
+    function chooseAnswer(id) {
+        if (chosenAnswerId === id) {
+            id = null; // unselect if clicking the already chosen answer
         }
+        updateChosenAnswer(id);
+        vscode.postMessage({ command: 'chooseAnswer', id })
     }
 
     document.getElementById('post-question-btn')
@@ -185,10 +187,10 @@
                 elm.addEventListener('click', () => chooseAnswer(answer.id))
                 return elm
             })
-            
             const container = document.querySelector('#answer-container')
             container.innerHTML = ""
             elements.forEach(elm => container.appendChild(elm))
+            updateChosenAnswer(event.data.chosenAnswerId);
             hljs.highlightAll();
         }
     });

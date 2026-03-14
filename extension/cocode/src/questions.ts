@@ -6,7 +6,7 @@ type State = {
     questionId: number;
     originalQuestionContent: string;
 
-    editor: vscode.TextEditor;
+    document: vscode.TextDocument;
     range: DynamicRange | null;
 }
 
@@ -64,6 +64,10 @@ export class QuestionManager {
             if (this.state === null) return;
             this.state.range?.update(event)
         })
+
+        vscode.window.onDidChangeVisibleTextEditors(() => {
+            this.refreshDecorations();
+        })
     }
 
     onRangeRemoved() {
@@ -97,17 +101,16 @@ export class QuestionManager {
 
         this.state = {
             questionId,
-            editor,
+            document: editor.document,
             range: new DynamicRange(fullLineRange, this.onRangeRemoved),
             originalQuestionContent: editor.document.getText(fullLineRange)
         }
 
-
-        this.decorationHandler.updateRange(editor, range);
+        this.decorationHandler.updateRange(this.state.document, fullLineRange);
     }
 
     // answer = null -> unselect answer and go back to original buffer
-    chooseAnswer(answer: Answer | null) {
+    async chooseAnswer(answer: Answer | null) {
         if (!this.state || !this.state.range) {
             vscode.window.showErrorMessage("No question has been asked")
             return;
@@ -115,14 +118,20 @@ export class QuestionManager {
 
         const replacement = answer ? answer.text : this.state.originalQuestionContent;
         const range = this.state.range?.internalRange()
-        const editor = this.state.editor;
+        let editor = vscode.window.visibleTextEditors.find(e => 
+            e.document === this.state?.document
+        );
+
+        if (!editor) {
+            editor = await vscode.window.showTextDocument(this.state.document, { selection: range });
+        }
 
         editor.edit(editBuilder => {
             if (!this.state) {
                 vscode.window.showErrorMessage("No question has been asked")
                 return;
             }
-            this.decorationHandler.clear(editor)
+            this.decorationHandler.clear(this.state.document)
             this.state.range = null;
 
             editBuilder.replace(range, replacement);
@@ -143,7 +152,7 @@ export class QuestionManager {
                 );         
 
                 this.state.range = new DynamicRange(new vscode.Range(newStart, newEnd), this.onRangeRemoved); 
-                this.decorationHandler.updateRange(editor, this.state.range.internalRange())   
+                this.decorationHandler.updateRange(this.state.document, this.state.range.internalRange())   
                 vscode.window.showInformationMessage("Code updated with the chosen answer!");
             } else {
                 vscode.window.showErrorMessage("Failed to apply the code change.");
@@ -152,14 +161,21 @@ export class QuestionManager {
     }
 
     endQuestion() {
-        if (this.state?.editor) {
-            this.decorationHandler.clear(this.state.editor)
+        if (this.state?.document) {
+            this.decorationHandler.clear(this.state.document)
         }
         this.state = null;
     }
 
     getActiveQuestionId(): number | null {
         return this.state?.questionId ?? null
+    }
+
+    refreshDecorations() {
+        if (this.state?.range) {
+            this.decorationHandler.clear(this.state.document);
+            this.decorationHandler.updateRange(this.state.document, this.state.range.internalRange())
+        }
     }
 }
 
@@ -168,15 +184,23 @@ class DecorationHandler {
     constructor() {
         this.decoration = vscode.window.createTextEditorDecorationType({
             isWholeLine: true,
-            backgroundColor: 'rgba(164, 37, 15, 0.3)'
+            backgroundColor: 'rgba(34, 170, 34, 0.1)'
         });
     }
 
-    clear(editor: vscode.TextEditor) {
-        editor.setDecorations(this.decoration, []);
+    clear(document: vscode.TextDocument) {
+        vscode.window.visibleTextEditors.forEach(e => {
+            if (e.document === document) {
+                e.setDecorations(this.decoration, [])
+            }
+        })
     }
 
-    updateRange(editor: vscode.TextEditor, range: vscode.Range) {
-        editor.setDecorations(this.decoration, [range]);
+    updateRange(document: vscode.TextDocument, range: vscode.Range) {
+        vscode.window.visibleTextEditors.forEach(e => {
+            if (e.document === document) {
+                e.setDecorations(this.decoration, [range])
+            }
+        })
     }
 }
