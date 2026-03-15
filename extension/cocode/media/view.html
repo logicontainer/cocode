@@ -163,6 +163,11 @@
         margin: 0px;
     }
 
+    .loading {
+        background: var(--vscode-button-secondaryBackground);
+        pointer-events: none;
+    }
+
   </style>
 </head>
 <body>
@@ -314,12 +319,20 @@
           answerCountElement.textContent = data.answers.length.toString();
 
           break;
+
+        case 'enablePostQuestionButton':
+          const postQuestionBtn = document.getElementById('post-question-btn');
+          postQuestionBtn.classList.remove('loading');
+          postQuestionBtn.textContent = "Collaborate on selection";
+          break;
       }
     });
 
-    document.getElementById('post-question-btn')
-        .addEventListener('click', () => {
+    const postQuestionBtn = document.getElementById('post-question-btn');
+    postQuestionBtn.addEventListener('click', () => {
       vscode.postMessage({ command: 'postQuestion' });
+      postQuestionBtn.classList.add('loading');
+      postQuestionBtn.textContent = "Loading..."
     });
 
     document.getElementById('accept-answer-btn')

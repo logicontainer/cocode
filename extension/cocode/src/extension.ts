@@ -160,16 +160,22 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("cocode.postQuestion", async () => {
+    vscode.commands.registerCommand("cocode.postQuestion", async (callback) => {
       const editor = vscode.window.activeTextEditor;
 
       if (!editor) {
         vscode.window.showWarningMessage("No active file.");
+        if (callback) {
+          callback(false);
+        }
         return;
       }
 
       if (!sessionJoined) {
         vscode.window.showWarningMessage("No active session");
+        if (callback) {
+          callback(false);
+        }
         return;
       }
 
@@ -177,11 +183,17 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.showWarningMessage(
           "There is an active unanswered question",
         );
+        if (callback) {
+          callback(false);
+        }
         return;
       }
 
       await questionManager.startQuestion(editor);
       sidepanelViewProvider.updateQuestion(questionManager.getActiveQuestion());
+      if (callback) {
+        callback(true);
+      }
     }),
   );
 
