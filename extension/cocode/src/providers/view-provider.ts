@@ -6,6 +6,7 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private html: string;
   private extensionUri: vscode.Uri;
+  private cocodeBaseUrl: string;
   private onChooseAnswer: (id: number | null) => void; // id = null means unselecting chosen answer
 
   private rejoinableSessionCode: number | null = null;
@@ -14,11 +15,18 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   private chosenAnswerId: number | null = null;
   private question: Question | null = null;
 
-  constructor(htmlPath: string, rejoinableSessionCode: number | null, extensionUri: vscode.Uri, onChooseAnswer: (id: number | null) => void) {
-	  this.html = fs.readFileSync(htmlPath, 'utf-8');
+  constructor(
+    htmlPath: string, 
+    rejoinableSessionCode: number | null,
+    extensionUri: vscode.Uri, 
+    onChooseAnswer: (id: number | null) => void,
+    cocodeBaseUrl: string,
+  ) {
+    this.html = fs.readFileSync(htmlPath, 'utf-8');
     this.extensionUri = extensionUri;
     this.onChooseAnswer = onChooseAnswer;
     this.rejoinableSessionCode = rejoinableSessionCode;
+    this.cocodeBaseUrl = cocodeBaseUrl;
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -39,7 +47,8 @@ export class ViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = this._getHtml()      
       .replaceAll("{{CODEICONS_URI_MAGICAL_STRING}}", codiconsUri.toString())
-      .replaceAll("{{CODE_COMPLETION_STYLESHEET_MAGICAL_STRING}}", codeCompletionStylesheet);
+      .replaceAll("{{CODE_COMPLETION_STYLESHEET_MAGICAL_STRING}}", codeCompletionStylesheet)
+      .replaceAll("{{COCODE_BASE_URL}}", this.cocodeBaseUrl);
 
     // Handle messages sent from the webview
     webviewView.webview.onDidReceiveMessage(({ command, ...data }) => {

@@ -170,7 +170,6 @@ export class QuestionManager {
 
                 this.state.range = new DynamicRange(new vscode.Range(newStart, newEnd), this.onRangeRemoved); 
                 this.decorationHandler.updateRange(this.state.document, this.state.range.internalRange())   
-                vscode.window.showInformationMessage("Code updated with the chosen answer!");
             } else {
                 vscode.window.showErrorMessage("Failed to apply the code change.");
             }

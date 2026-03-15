@@ -24,16 +24,9 @@
     "views": {
       "cocode": [
         {
-          "id": "cocodeCreateSession",
-          "name": "Create Session",
-          "type": "webview",
-          "when": "!cocode.inSession"
-        },
-        {
-          "id": "cocodeAnswers",
-          "name": "Answers",
-          "type": "webview",
-          "when": "cocode.inSession"
+          "id": "cocodeSidepanelView",
+          "name": "Cocode Sidepanel",
+          "type": "webview"
         }
       ]
     },
@@ -57,6 +50,10 @@
       {
         "command": "cocode.rejectSuggestions",
         "title": "CoCode: Reject Suggestions"
+      },
+      {
+        "command": "cocode.deleteSuggestion",
+        "title": "CoCode: Delete Suggestions"
       }
     ],
     "menus": {
@@ -67,6 +64,17 @@
           "when": "editorTextFocus"
         }
       ]
+    },
+    "configuration": {
+      "title": "CoCode",
+      "type": "object",
+      "properties": {
+        "cocode.serverUrl": {
+          "type": "string",
+          "default": "http://cocode.kasperskov.dev",
+          "description": "Location of CoCode server"
+        }
+      }
     }
   },
   "scripts": {

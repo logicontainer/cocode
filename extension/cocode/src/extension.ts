@@ -11,7 +11,7 @@ import { supabase } from "./supabase";
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 // Fetch base url from env var
-const baseUrl = process.env.COCODE_API_BASE_URL || "http://localhost:3000";
+const baseUrl = vscode.workspace.getConfiguration("cocode").get("serverUrl", "https://cocode.kasperskov.dev");
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log("CoCode started");
@@ -55,7 +55,8 @@ export async function activate(context: vscode.ExtensionContext) {
     viewPath,
     oldSessionExists && previousCode || null, 
     context.extensionUri,
-    onChooseAnswerInPanel
+    onChooseAnswerInPanel,
+    baseUrl
   );
 
   context.subscriptions.push(

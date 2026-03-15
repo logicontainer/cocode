@@ -162,7 +162,7 @@
     <p>
         Start a new live coding session to post questions, 
         and receive answers. Students can write answers 
-        <a href="https://cocode.kasperskov.dev">here</a>!
+        <a href="{{COCODE_BASE_URL}}">here</a>!
     </p>
     <button id="start-session-btn">Create Session</button>
     <div id="rejoinable-session-code" style="display: none;">
@@ -176,7 +176,7 @@
   <div id="answer-page">
     <div class="centered">
         <p>Go to</p>
-        <h2>cocode.kasperskov.dev</h2>
+        <h2>{{COCODE_BASE_URL}}</h2>
         <div style="height:12px"></div>
         <p>Enter the code</p>
         <h1><a id="session-code-value"></a></h1>
@@ -276,7 +276,7 @@
         case 'setSessionCode':
           const element = document.getElementById('session-code-value');
           element.textContent = data.code;
-          element.href = `https://cocode.kasperskov.dev/answer?code=${data.code}`;
+          element.href = `{{COCODE_BASE_URL}}/answer?code=${data.code}`;
           break;
 
         case 'updateQuestion':
