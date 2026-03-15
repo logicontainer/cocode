@@ -15,6 +15,7 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   private sessionCode: number | null = null;
   private chosenAnswerId: number | null = null;
   private question: Question | null = null;
+  private suggestionsVisible: boolean = false;
 
   constructor(
     htmlPath: string, 
@@ -66,6 +67,8 @@ export class ViewProvider implements vscode.WebviewViewProvider {
         });
       } else if (command === 'debug') {
         vscode.window.showInformationMessage(`[WEBVIEW DEBUG]: ${data.msg}`);
+      } else if (command === 'updateSuggestionsVisible') {
+        this.updateSuggestionVisible(data.visible);
       } else if (command === 'chooseAnswer') {
         this.chosenAnswerId = data.id;
         this.onChooseAnswer(data.id)
@@ -92,6 +95,7 @@ export class ViewProvider implements vscode.WebviewViewProvider {
     this.sendSessionCodeToWebview();
     this.sendAnswersToWebview();
     this.sendQuestionIdToWebview();
+    this.sendSuggestionsVisibleToWebview();
   }
 
   private sendRejoinableSessionCodeToWebview(): void {
@@ -129,6 +133,15 @@ export class ViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private sendSuggestionsVisibleToWebview(): void {
+    if (this._view) {
+      this._view.webview.postMessage({
+        command: 'updateSuggestionsVisible',
+        visible: this.suggestionsVisible
+      });
+    }
+  }
+
   // Call this from anywhere in your extension to update the label
   updateSessionCode(code: number) {
     this.sessionCode = code;
@@ -145,6 +158,11 @@ export class ViewProvider implements vscode.WebviewViewProvider {
     this.chosenAnswerId = null;
     this.blackListAnswerIds = new Set();
     this.sendQuestionIdToWebview();
+  }
+
+  updateSuggestionVisible(visible: boolean) {
+    this.suggestionsVisible = visible;
+    this.sendSuggestionsVisibleToWebview();
   }
 
   showAnswerPage() {

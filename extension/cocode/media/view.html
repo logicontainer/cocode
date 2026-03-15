@@ -85,6 +85,10 @@
         overflow-y: auto;
     }
 
+    #answer-container:disabled {
+      display: none;
+    }
+
     .answer {
         position: relative;
         background: var(--vscode-sideBar-background);
@@ -168,6 +172,43 @@
         pointer-events: none;
     }
 
+    .divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      color: var(--vscode-button-background);
+    } 
+
+    .divider:hover {
+      color: var(--vscode-button-hoverBackground);
+      cursor: pointer;
+    }
+    
+
+    .divider::before,
+    .divider::after {
+      content: "";
+      flex: 1;
+      border: 0px;
+      border-bottom: 1px;
+      border-color: var(--vscode-button-background);
+      border-style: solid;
+    }
+
+    .divider:hover::after,
+    .divider:hover::before {
+      border-color: var(--vscode-button-hoverBackground);
+    }
+    
+    .divider::before {
+      margin-right: 10px;
+    }
+
+    .divider::after {
+      margin-left: 10px;
+    }
+
+
   </style>
 </head>
 <body>
@@ -199,6 +240,7 @@
     <button id="accept-answer-btn" disabled>Accept suggestion</button>
     <button id="reject-answer-btn">Reject suggestions</button>
     <h2 id="answers-header" style="margin-bottom: 0px">Suggestions: <span id="answer-count">0</span></h2>
+    <div class="divider"><i class="codicon codicon-eye-closed" id="eye-icon"></i></div>
     <div id="answer-container"></div>
   </div>
 
@@ -215,12 +257,22 @@
     </template>
 
   <script>
+
+
     function showPage(pageId) {
       document.getElementById('setup-page').classList.toggle('visible', pageId === 'setup-page');
       document.getElementById('answer-page').classList.toggle('visible', pageId === 'answer-page');
     }
-
     const vscode = acquireVsCodeApi();
+
+    function debug(msg) {
+      vscode.postMessage({
+        command: 'debug',
+        msg
+      })
+    }
+
+    let suggestionsVisible = false;
 
     const startSessionBtn = document.getElementById('start-session-btn');
     startSessionBtn.addEventListener('click', () => {
@@ -233,6 +285,16 @@
       .addEventListener('click', () => {
         vscode.postMessage({ command: 'RejoinSession' });
     });
+
+    document.getElementsByClassName('divider')[0]
+      .addEventListener('click', () => {
+        vscode.postMessage(
+          {
+            command: 'updateSuggestionsVisible',
+            visible: !suggestionsVisible 
+          });
+    });
+
 
     let answers = []
     let chosenAnswerId = null
@@ -293,6 +355,20 @@
 
         case 'updateQuestion':
           updateQuestion(data.id, data.language)
+          break;
+        
+        case 'updateSuggestionsVisible':
+          const eyeElm = document.getElementById('eye-icon');
+          suggestionsVisible = data.visible;
+          document.getElementById('answer-container')
+                  .style.display = suggestionsVisible ? 'flex' : 'none';
+          if (suggestionsVisible) {
+            eyeElm.classList.remove('codicon-eye-closed');
+            eyeElm.classList.add('codicon-eye');
+          } else {
+            eyeElm.classList.remove('codicon-eye');
+            eyeElm.classList.add('codicon-eye-closed');
+          }
           break;
 
         case 'updateAnswers':
