@@ -11,6 +11,7 @@ export class ViewProvider implements vscode.WebviewViewProvider {
 
   private rejoinableSessionCode: number | null = null;
   private answers: Answer[] = [];
+  private blackListAnswerIds: Set<number> = new Set();
   private sessionCode: number | null = null;
   private chosenAnswerId: number | null = null;
   private question: Question | null = null;
@@ -73,6 +74,8 @@ export class ViewProvider implements vscode.WebviewViewProvider {
       } else if (command === 'rejectSuggestions') {
         vscode.commands.executeCommand('cocode.rejectSuggestions');
       } else if (command === 'deleteSuggestion') {
+        this.blackListAnswerIds.add(data.id)
+        this.sendAnswersToWebview();
         vscode.commands.executeCommand('cocode.deleteSuggestion', data.id)
       }
     });
@@ -102,10 +105,15 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   }
 
   private sendAnswersToWebview(): void {
+
+    let filteredAnswers = this.answers.filter(
+      answer => !this.blackListAnswerIds.has(answer.id) 
+    );
+
     if (this._view) {
       this._view.webview.postMessage({
         command: 'updateAnswers',
-        answers: this.answers,
+        answers: filteredAnswers,
         chosenAnswerId: this.chosenAnswerId
       });
     }
@@ -135,6 +143,7 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   updateQuestion(question: Question | null) {
     this.question = question;
     this.chosenAnswerId = null;
+    this.blackListAnswerIds = new Set();
     this.sendQuestionIdToWebview();
   }
 
