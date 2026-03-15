@@ -91,6 +91,9 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   }
 
   private updateView() {
+    if(this.sessionCode) {
+      this.showAnswerPage();
+    }
     this.sendRejoinableSessionCodeToWebview();
     this.sendSessionCodeToWebview();
     this.sendAnswersToWebview();
