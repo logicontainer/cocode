@@ -41,9 +41,8 @@ type Transition = (
     answerId: Answer['id']
   }
   | {
-    enum: 'move range',
-    fromLine: number,
-    toLine: number,
+    enum: 'modify question',
+    newQuestion: Question,
   }
   | {
     enum: 'accept inspected suggestion'
@@ -85,6 +84,7 @@ const stateMachine: StateMachine = {
       }
     }
   },
+
   'in session, idle': {
     'pose question': async (state, { question }) => {
       const res = await fetch(`http://localhost:3000/api/sessions/${state.sessionId}/questions`, {
@@ -101,8 +101,8 @@ const stateMachine: StateMachine = {
         inspectedSuggestionId: null,
       } satisfies State
     },
-
   },
+
   'in session, taking suggestions': {
     'submit suggestion': (state, trans) => {
       if (trans.questionId !== state.question.id) {
@@ -116,14 +116,10 @@ const stateMachine: StateMachine = {
       };
     },
 
-    'move range': (state, { fromLine, toLine }) => {
+    'modify question': (state, { newQuestion }) => {
       return { 
         ...state, 
-        question: {
-          ...state.question,
-          fromLine,
-          toLine
-        }
+        question: newQuestion
       }
     },
 
@@ -144,7 +140,6 @@ const stateMachine: StateMachine = {
 }
 
 const doTransition = async (state: State, transition: Transition) => {
-
   const func = stateMachine[state.enum]?.[transition.enum] as | FuncForStateAndTransition<typeof state.enum, typeof transition.enum> | undefined;
   if (!func) {
     console.warn(`Transition undefined for ${state} + ${transition}`)
