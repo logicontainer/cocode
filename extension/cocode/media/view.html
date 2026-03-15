@@ -295,11 +295,18 @@
         case 'updateAnswers':
           answers = data.answers
 
+          function trimAnswer(text) {
+            const lines = text.split('\n')
+            const minMargin = lines.map(l => l.length - l.trimStart().length)
+                                   .reduce((a, b) => Math.min(a, b))
+            return lines.map(l => l.substring(minMargin)).join("\n")
+          }
+
           const elements = data.answers.map(answer => {
             const elm = document.querySelector('#answer-template').content.firstElementChild.cloneNode(true)
             elm.id = `answer-${answer.id}`
             const codeElement = elm.querySelector('.answer-code');
-            codeElement.textContent = answer.text;
+            codeElement.textContent = trimAnswer(answer.text);
             codeElement.classList.add(`language-${currentQuestionLanguage}`);
             elm.addEventListener('click', () => chooseAnswer(answer.id))
             elm.querySelector('.answer-delete-icon').addEventListener('click', (e) => {
