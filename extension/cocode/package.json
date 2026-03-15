@@ -25,7 +25,7 @@
       "cocode": [
         {
           "id": "cocodeSidepanelView",
-          "name": "Cocode Sidepanel",
+          "name": "Collaborative Coding",
           "type": "webview"
         }
       ]
