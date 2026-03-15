@@ -242,6 +242,8 @@ export async function activate(context: vscode.ExtensionContext) {
       await fetch(`${baseUrl}/api/sessions/${sessionId}/questions/${questionId}/answers/${id}`, {
         method: "DELETE"
       });
+
+      questionManager.chooseAnswer(null);
     })
   );
 }
