@@ -1,4 +1,5 @@
 import { Answer } from "../src/types";
+import { State } from "../src/statemachine"
 
 declare const COCODE_BASE_URL: string
 declare const acquireVsCodeApi: () => { postMessage: (_: any) => void }
@@ -31,133 +32,164 @@ for (const btn of Array.from(document.querySelectorAll<HTMLButtonElement>(select
   }
 }
 
-let chosenAnswerId: number | null = null
-let currentQuestionLanguage: string | null = null;
-updateQuestion(null, null);
+// let chosenAnswerId: number | null = null
+// let currentQuestionLanguage: string | null = null;
+// updateQuestion(null, null);
+//
+// function updateQuestion(id: number | null, language: string | null) {
+//   currentQuestionLanguage = language 
+// }
+//
+// function updateChosenAnswer(id: number | null) {
+//   chosenAnswerId = id;
+//   const answerElements = document.querySelectorAll('.answer');
+//   answerElements.forEach(elm => {
+//     if (chosenAnswerId !== null && elm.id === `answer-${chosenAnswerId}`) {
+//       elm.classList.add('chosen');
+//     } else {
+//       elm.classList.remove('chosen');
+//     }
+//   });
+//   document.querySelector<HTMLButtonElement>('#accept-answer-btn')!.disabled = chosenAnswerId === null
+// }
+//
+//
 
-function updateQuestion(id: number | null, language: string | null) {
-  currentQuestionLanguage = language 
-  document.querySelector<HTMLButtonElement>('#post-question-btn')!.disabled = id !== null
-  document.querySelector<HTMLButtonElement>('#accept-answer-btn')!.disabled = id === null || chosenAnswerId === null
-  document.querySelector<HTMLButtonElement>('#reject-answer-btn')!.disabled = id === null
-  document.querySelector<HTMLHeadingElement>('#answers-header')!.hidden = id === null
+function chooseAnswer(id: number | null) { vscode.postMessage({ command: 'chooseAnswer', id }) }
+
+function disableStartSessionButton() {
+  const btn = document.getElementById('start-session-btn')!;
+  btn.classList.add('loading');
+  btn.textContent = "Loading...";
 }
 
-function updateChosenAnswer(id: number | null) {
-  chosenAnswerId = id;
-  const answerElements = document.querySelectorAll('.answer');
-  answerElements.forEach(elm => {
-    if (chosenAnswerId !== null && elm.id === `answer-${chosenAnswerId}`) {
-      elm.classList.add('chosen');
-    } else {
-      elm.classList.remove('chosen');
-    }
-  });
-  document.querySelector<HTMLButtonElement>('#accept-answer-btn')!.disabled = chosenAnswerId === null
+function enableStartSessionButton() {
+  const btn = document.getElementById('start-session-btn')!;
+  btn.classList.remove('loading');
+  btn.textContent = "Create session";
 }
 
-function chooseAnswer(id: number | null) {
-  if (chosenAnswerId === id) {
-    id = null; // unselect if clicking the already chosen answer
-  }
-  updateChosenAnswer(id);
-  vscode.postMessage({ command: 'chooseAnswer', id })
+function enablePostQuestionButton() {
+  const btn = document.getElementById('post-question-btn')!;
+  btn.classList.remove('loading');
+  btn.textContent = "Collaborate on selection";
 }
+
+function disablePostQuestionButton() {
+  const btn = document.getElementById('post-question-btn')!;
+  btn.classList.add('loading');
+  btn.textContent = "Loading...";
+}
+
+
+
+function setSessionCodeValue(code: number | null) {
+  const element = document.querySelector<HTMLLinkElement>('#session-code-value')!;
+  element.textContent = code?.toString() ?? "NULL";
+  element.href = `${COCODE_BASE_URL}/answer?code=${code}`;
+}
+
 
 window.addEventListener('message', (event) => {
   const { command, ...data } = event.data
 
-  switch (command) {
-    case 'showStartSessionPage':
-      showPage('setup-page')
-      break;
+  const startSessionBtn = document.getElementById('start-session-btn')!;
+  const postQuestionBtn = document.getElementById('post-question-btn')!;
+  if (command === 'updateState') {
+    const state = data.state as State
 
-    case 'showAnswerPage':
-      showPage('answer-page');
-      break;
+    // CLEAN up
+    document.querySelector<HTMLButtonElement>('#post-question-btn')!.disabled = true
+    document.querySelector<HTMLButtonElement>('#accept-answer-btn')!.disabled = true
+    document.querySelector<HTMLButtonElement>('#reject-answer-btn')!.disabled = true
+    document.querySelector<HTMLHeadingElement>('#answers-header')!.hidden = true
 
-    case 'setRejoinableSessionCode':
-      document.getElementById('rejoinable-session-code')!.style.display = 'block';
-      document.getElementById('rejoinable-session-code-value')!.textContent = data.code;
-      break;
+    switch (state.enum) {
+      case 'no session':
+        showPage('setup-page');
+        enableStartSessionButton();
+        disablePostQuestionButton();
 
-    case 'setSessionCode':
-      const element = document.querySelector<HTMLLinkElement>('#session-code-value')!;
-      element.textContent = data.code;
-      element.href = `${COCODE_BASE_URL}/answer?code=${data.code}`;
-      break;
+        if (state.rejoinableSession !== null) {
+          document.getElementById('rejoinable-session-code')!.style.display = 'block';
+          document.getElementById('rejoinable-session-code-value')!.textContent = state.rejoinableSession.code.toString();
+        }
 
-    case 'updateQuestion':
-      updateQuestion(data.id, data.language)
-      break;
-    
-    case 'updateSuggestionsVisible':
-      const eyeElm = document.getElementById('eye-icon')!;
-      suggestionsVisible = data.visible;
-      document.getElementById('answer-container')!
-              .style.display = suggestionsVisible ? 'flex' : 'none';
-      if (suggestionsVisible) {
-        eyeElm.classList.remove('codicon-eye-closed');
-        eyeElm.classList.add('codicon-eye');
-      } else {
-        eyeElm.classList.remove('codicon-eye');
-        eyeElm.classList.add('codicon-eye-closed');
-      }
-      break;
+        break;
 
-    case 'updateAnswers':
-      const trimAnswer = (text: string) => {
-        const lines = text.split('\n')
-        const minMargin = lines.map(l => l.length - l.trimStart().length)
-                               .reduce((a, b) => Math.min(a, b))
-        return lines.map(l => l.substring(minMargin)).join("\n")
-      }
+      case 'creating session':
+        showPage('setup-page');
+        disablePostQuestionButton();
+        disableStartSessionButton();
+        break
 
-      const elements = (data.answers as Answer[]).map(answer => {
-        const elm: HTMLElement = document.querySelector<HTMLTemplateElement>('#answer-template')!.content.firstElementChild!.cloneNode(true) as HTMLElement
-        elm.id = `answer-${answer.id}`
-        const codeElement = elm.querySelector('.answer-code')!;
-        codeElement.textContent = trimAnswer(answer.text);
-        codeElement.classList.add(`language-${currentQuestionLanguage}`);
-        elm.addEventListener('click', () => chooseAnswer(answer.id))
-        elm.querySelector('.answer-delete-icon')!.addEventListener('click', (e) => {
-          e.stopPropagation(); // prevent triggering the chooseAnswer event
-          vscode.postMessage({ command: 'deleteSuggestion', id: answer.id })
+      case 'in session, idle':
+        showPage('answer-page');
+        document.querySelector<HTMLButtonElement>('#post-question-btn')!.disabled = false
+        setSessionCodeValue(state.session.code)
+        disableStartSessionButton();
+        enablePostQuestionButton();
+        break;
+
+      case 'in session, taking suggestions':
+        showPage('answer-page');
+        setSessionCodeValue(state.session.code)
+        disableStartSessionButton();
+        disablePostQuestionButton();
+
+        document.querySelector<HTMLButtonElement>('#accept-answer-btn')!.disabled = state.selectedSuggestionId !== null
+        document.querySelector<HTMLButtonElement>('#reject-answer-btn')!.disabled = false
+        document.querySelector<HTMLHeadingElement>('#answers-header')!.hidden = false
+
+        const trimAnswer = (text: string) => {
+          const lines = text.split('\n')
+          const minMargin = lines.map(l => l.length - l.trimStart().length)
+                                 .reduce((a, b) => Math.min(a, b))
+          return lines.map(l => l.substring(minMargin)).join("\n")
+        }
+
+        const elements = state.suggestions.map(answer => {
+          const elm: HTMLElement = document.querySelector<HTMLTemplateElement>('#answer-template')!.content.firstElementChild!.cloneNode(true) as HTMLElement
+          elm.id = `answer-${answer.id}`
+          const codeElement = elm.querySelector('.answer-code')!;
+          codeElement.textContent = trimAnswer(answer.text);
+          codeElement.classList.add(`language-${state.question.language}`);
+          elm.addEventListener('click', () => chooseAnswer(answer.id))
+          elm.querySelector('.answer-delete-icon')!.addEventListener('click', (e) => {
+            e.stopPropagation(); // prevent triggering the chooseAnswer event
+            vscode.postMessage({ command: 'deleteSuggestion', id: answer.id })
+          })
+          return elm
         })
-        return elm
-      })
 
-      const container = document.querySelector('#answer-container')!
-      container.innerHTML = ""
-      elements.forEach(elm => container.appendChild(elm))
-      updateChosenAnswer(data.chosenAnswerId);
-      hljs.highlightAll();
+        const container = document.querySelector('#answer-container')!
+        container.innerHTML = ""
+        elements.forEach(elm => container.appendChild(elm))
+        hljs.highlightAll();
 
-      const answerCountElement = document.getElementById('answer-count')!;
-      answerCountElement.textContent = data.answers.length.toString();
+        const answerCountElement = document.getElementById('answer-count')!;
+        answerCountElement.textContent = data.answers.length.toString();
 
-      break;
+        break;
+    }
 
-    case 'setPostQuestionButtonEnabled':
-      const postQuestionBtn = document.getElementById('post-question-btn')!;
-      if (data.enabled) {
-        postQuestionBtn.classList.remove('loading');
-        postQuestionBtn.textContent = "Collaborate on selection";
-      } else {
-        postQuestionBtn.classList.add('loading');
-        postQuestionBtn.textContent = "Loading...";
-      }
-      break;
-
-    case 'setStartSessionButtonEnabled':
-      const startSessionBtn = document.getElementById('start-session-btn')!;
-      if (data.enabled) {
-        startSessionBtn.classList.remove('loading');
-        startSessionBtn.textContent = "Create Session";
-      } else {
-        startSessionBtn.classList.add('loading');
-        startSessionBtn.textContent = "Loading...";
-      }
-      break;
+  } else {
+    debug(`Unknown command ${command}`)
   }
+  //   case 'updateSuggestionsVisible':
+  //     const eyeElm = document.getElementById('eye-icon')!;
+  //     suggestionsVisible = data.visible;
+  //     document.getElementById('answer-container')!
+  //             .style.display = suggestionsVisible ? 'flex' : 'none';
+  //     if (suggestionsVisible) {
+  //       eyeElm.classList.remove('codicon-eye-closed');
+  //       eyeElm.classList.add('codicon-eye');
+  //     } else {
+  //       eyeElm.classList.remove('codicon-eye');
+  //       eyeElm.classList.add('codicon-eye-closed');
+  //     }
+  //     break;
 });
+
+
+vscode.postMessage({ command: 'requestUIUpdate' })

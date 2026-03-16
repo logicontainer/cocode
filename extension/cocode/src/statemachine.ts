@@ -20,7 +20,7 @@ export type InSessionStates = {
 )
 
 export type State = (
-  | { enum: 'no session' }
+  | { enum: 'no session', rejoinableSession: Session | null }
   | { enum: 'creating session' }
   | InSessionStates
 )
@@ -29,7 +29,7 @@ type StateEnum = State['enum']
 
 type Transition = (
   | { enum: 'EDITOR: create session' }
-  | { enum: 'EDITOR: rejoin session', session: Session }
+  | { enum: 'EDITOR: rejoin session' }
   | { 
     enum: 'SERVER: session created',
     session: Session
@@ -113,14 +113,17 @@ export class StateMachineHandler {
   private onPoseQuestion: (sessionId: Session["id"], question: Omit<Question, "id">) => void
   private onDeleteSuggestion: (sessionId: Session["id"], questionId: Question["id"], suggId: Answer["id"]) => void
 
-  private state_: State = { enum: 'no session' }
+  private state_: State
   private observers: StateMachineObserver[]
 
   constructor(
-    onCreateSession: () => void,
+    initialState: State,
+    // this should be a strategy pattern
+    onCreateSession: () => void, 
     onPoseQuestion: (sessionId: Session["id"], question: Omit<Question, "id">) => void,
     onDeleteSuggestion: (sessionId: Session["id"], questionId: Question["id"], suggId: Answer["id"]) => void,
   ) {
+    this.state_ = initialState
     this.onCreateSession = onCreateSession;
     this.onPoseQuestion = onPoseQuestion;
     this.onDeleteSuggestion = onDeleteSuggestion
@@ -135,8 +138,10 @@ export class StateMachineHandler {
     this.observers.forEach(obs => obs.onStateUpdate(this.state_))
   }
 
+  forceUpdate() { return this.notifyStateUpdate() }
+
   editorCreateSession() { this.doTransition({ enum: 'EDITOR: create session' }) }
-  editorRejoinSession(session: Session) { this.doTransition({ enum: 'EDITOR: rejoin session', session }) }
+  editorRejoinSession(session: Session) { this.doTransition({ enum: 'EDITOR: rejoin session' }) }
   editorPoseQuestion(question: Omit<Question, "id">) { this.doTransition({ enum: 'EDITOR: pose question', question }) }
   editorModifyQuestion(question: Omit<Question, "id">) { this.doTransition({ enum: 'EDITOR: modify question', newQuestion: question })}
   editorSelectSuggestion(suggId: Answer["id"] | null) { this.doTransition({ enum: 'EDITOR: select suggestion', suggId }) }
@@ -155,10 +160,15 @@ export class StateMachineHandler {
           this.onCreateSession();
           return { enum: 'creating session' }
         },
-        'EDITOR: rejoin session': (_, { session }) => {
+        'EDITOR: rejoin session': (state, _) => {
+          if (!state.rejoinableSession) {
+            console.error("No rejoinable session")
+            return state;
+          }
+
           return {
             enum: 'in session, idle',
-            session,
+            session: state.rejoinableSession,
           }
         }
       },

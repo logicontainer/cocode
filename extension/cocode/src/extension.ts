@@ -7,7 +7,7 @@ import { Answer, Question, QuestionPostResult, Session } from "./types";
 import { ViewProvider } from "./providers/view-provider";
 import { QuestionManager } from "./questions";
 import { supabase } from "./supabase";
-import { isInSession, isTakingSuggestions, StateMachineHandler } from "./statemachine";
+import { isInSession, isTakingSuggestions, State, StateMachineHandler } from "./statemachine";
 
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
@@ -37,6 +37,8 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     const session = (await result.json()) as Session;
+    context.workspaceState.update("cocodeSessionId", session.id)
+    context.workspaceState.update("cocodeSessionCode", session.code)
     stateMachineHandler.handleServerSessionCreated(session)
   }
 
@@ -61,6 +63,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
 
   const stateMachineHandler = new StateMachineHandler(
+    { enum: 'no session', rejoinableSession: (oldSessionExists ? { id: previousId, code: previousCode } : null) },
     handleCreateSession,
     handlePoseQuestion,
     handleDeleteSuggestion,
@@ -78,11 +81,9 @@ export async function activate(context: vscode.ExtensionContext) {
     },
   })
 
-  let answers: Answer[] = [];
   const onChooseAnswerInPanel = (id: number | null) => {
     stateMachineHandler.editorSelectSuggestion(id)
   };
-
 
   const viewHtmlPath = path.join(
     context.extensionPath,
@@ -100,10 +101,10 @@ export async function activate(context: vscode.ExtensionContext) {
   const sidepanelViewProvider = new ViewProvider(
     viewHtmlPath,
     viewJsPath,
-    oldSessionExists && previousCode || null, 
     context.extensionUri,
     onChooseAnswerInPanel,
-    baseUrl
+    baseUrl,
+    () => stateMachineHandler.forceUpdate()
   );
 
   context.subscriptions.push(
