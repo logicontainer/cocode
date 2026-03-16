@@ -47,7 +47,7 @@ export async function POST(
     });
 
     console.log(`Added question with id ${created.id} to session ${sid}`);
-    emitter.emit(`update:${session.code}`, {
+    emitter.emit(`update-question-for-code:${session.code}`, {
       message: "createdQuestion",
       createdAt: created.createdAt,
     });

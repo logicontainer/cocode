@@ -2,6 +2,7 @@ import { Answer, answerNoIdSchema } from "@/types/api";
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
+import { emitter } from "@/lib/eventEmitter";
 
 export async function POST(
   req: NextRequest,
@@ -44,7 +45,15 @@ export async function POST(
         text: answer.text ?? null,
         question: { connect: { id: questionId } },
       },
-      select: { id: true },
+      select: { id: true, createdAt: true },
+    });
+
+
+    const eventId = `answer-to-question:${question.id}`
+    console.log(eventId)
+    emitter.emit(eventId, {
+      message: "createdAnswer",
+      createdAt: created.createdAt,
     });
 
     return NextResponse.json({ id: created.id }, { status: 201 });

@@ -5,9 +5,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ code: string }> }, // Next.js 15+ async params
+  { params }: { params: Promise<{ sid: string; qid: string }> },
 ) {
-  const { code } = await params;
+  const { sid, qid } = await params;
+  console.log(`GET event sessions questions answers ${sid}, ${qid}`)
   let controller: ReadableStreamDefaultController;
 
   const stream = new ReadableStream({
@@ -18,28 +19,29 @@ export async function GET(
       // 1. Send an initial ping to establish connection
       controller.enqueue(
         encoder.encode(
-          `event: connected\ndata: {"status": "listening for answers for session with code: ${code}"}\n\n`,
+          `event: connected\ndata: {"status": "listening to session ${sid}, question ${qid}"}\n\n`,
         ),
       );
 
-      // 2. Define the callback that fires when this session is updated
+      // 2. Define the callback that fires when an answer arrives
       const onUpdate = (data: any) => {
+        console.log("on update")
         const payload = JSON.stringify(data);
         controller.enqueue(
-          encoder.encode(
-            `event: update-question-for-code:${code}\ndata: ${payload}\n\n`,
-          ),
+          encoder.encode(`event: answer-to-question:${qid}\ndata: ${payload}\n\n`),
         );
       };
 
       // 3. Listen only to events for this specific session id
-      const eventName = `update-question-for-code:${code}`;
-      emitter.on(eventName, onUpdate);
+      const eventId = `answer-to-question:${qid}`;
+      emitter.on(eventId, onUpdate);
 
       // 4. Handle client disconnects to prevent memory leaks
       request.signal.addEventListener("abort", () => {
-        emitter.off(eventName, onUpdate);
-        console.log(`Client disconnected from session ${code}`);
+        emitter.off(eventId, onUpdate);
+        console.log(
+          `Client disconnected from listening for answers on question ${qid}`,
+        );
       });
     },
   });

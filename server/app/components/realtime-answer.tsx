@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+
 import Answer from "./answer";
 
 export default function RealtimeAnswer({
@@ -19,26 +20,28 @@ export default function RealtimeAnswer({
     const url = `/api/events/questions/current/${code}`;
     const sse = new EventSource(url);
 
-    // Listen for the custom 'update' event we defined in our Next.js stream
-    sse.addEventListener("update", (event) => {
+    // Listen for the custom 'update-question-for-code' event we defined in our Next.js stream
+    sse.addEventListener(`update-question-for-code:${code}`, (event) => {
       const data = JSON.parse(event.data);
       console.log(`Received ping for session with code ${code}:`, data);
 
-      fetch(`/api/questions/current/${code}`).then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`Response status: ${response.status}`);
-        }
-        const latestQuestion = await response.json();
-        if (!latestQuestion) {
-          console.error("Failed to fetch latest question.")
-        }
-        if (JSON.stringify(prevQuestion.current) != JSON.stringify(data)) {
-          setQuestion(latestQuestion);
-          prevQuestion.current = latestQuestion
-        }
-      }).catch((err) => {
-        setError(err.message)
-      })
+      fetch(`/api/questions/current/${code}`)
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+          }
+          const latestQuestion = await response.json();
+          if (!latestQuestion) {
+            console.error("Failed to fetch latest question.");
+          }
+          if (JSON.stringify(prevQuestion.current) != JSON.stringify(data)) {
+            setQuestion(latestQuestion);
+            prevQuestion.current = latestQuestion;
+          }
+        })
+        .catch((err) => {
+          setError(err.message);
+        });
     });
 
     // Handle standard connection messages

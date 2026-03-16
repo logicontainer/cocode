@@ -4,14 +4,16 @@ import * as vscode from "vscode";
 
 import { Answer, Question, QuestionPostResult, Session } from "./types";
 
-import { ViewProvider } from "./providers/view-provider";
+import { EventSource } from "eventsource";
 import { QuestionManager } from "./questions";
-import { supabase } from "./supabase";
+import { ViewProvider } from "./providers/view-provider";
 
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 // Fetch base url from env var
-const baseUrl = vscode.workspace.getConfiguration("cocode").get("serverUrl", "https://cocode.kasperskov.dev");
+const baseUrl = vscode.workspace
+  .getConfiguration("cocode")
+  .get("serverUrl", "https://cocode.kasperskov.dev");
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log("CoCode started");
@@ -26,9 +28,8 @@ export async function activate(context: vscode.ExtensionContext) {
     oldSessionExists,
   );
 
-
   let answers: Answer[] = [];
-  const onChooseAnswerInPanel = (id: number | null) => {
+  const onChooseAnswerInPanel = (id: string | null) => {
     if (id === null) {
       questionManager.chooseAnswer(null);
       return;
@@ -39,38 +40,33 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.window.showErrorMessage(`Answer with id ${id} doesn't exist.`);
       return;
     }
-    const answer = answers[idx]
+    const answer = answers[idx];
     //vscode.window.showInformationMessage(`Chose answer ${answer}`);
-    questionManager.chooseAnswer(answer)
+    questionManager.chooseAnswer(answer);
   };
 
-
-  const viewHtmlPath = path.join(
-    context.extensionPath,
-    "media",
-    "view.html",
-  );
+  const viewHtmlPath = path.join(context.extensionPath, "media", "view.html");
 
   const viewJsPath = path.join(
     context.extensionPath,
     "out",
     "media",
-    "view.js"
-  )
+    "view.js",
+  );
 
   const sidepanelViewProvider = new ViewProvider(
     viewHtmlPath,
     viewJsPath,
-    oldSessionExists && previousCode || null, 
+    (oldSessionExists && previousCode) || null,
     context.extensionUri,
     onChooseAnswerInPanel,
-    baseUrl
+    baseUrl,
   );
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       "cocodeSidepanelView",
-      sidepanelViewProvider
+      sidepanelViewProvider,
     ),
   );
 
@@ -96,31 +92,33 @@ export async function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    const result = await fetch(
-      `${baseUrl}/api/sessions/${sessionId}/questions/${question.id}/answers`,
-    );
-    answers = (await result.json()) as Answer[];
-
-    sidepanelViewProvider.updateAnswers(answers);
+    fetch(`${baseUrl}/api/sessions/${sessionId}/questions/${question.id}/answers`)
+      .then((res) => {
+        return res.json();
+      })
+      .then((answers: Answer[]) => {
+        sidepanelViewProvider.updateAnswers(answers);
+      })
+      .catch((err) => {
+        console.error(err);
+      });
   };
 
-  const _ = supabase
-    .channel("realtime-answers")
-    .on(
-      "postgres_changes",
-      {
-        event: "*", // Listen for INSERTs, UPDATEs, or DELETEs
-        schema: "public",
-        table: "Answer",
-      },
-      async () => {
-        await apiPollAnswers();
-      },
-    )
-    .subscribe();
+  function subscribeToAnswers(sid: string, qid: string) {
+    const url = `${baseUrl}/api/events/sessions/${sid}/questions/${qid}/answers`;
+    const sse = new EventSource(url);
+
+    // Listen for the custom 'answer-to-question' event we defined in our Next.js stream
+    const eventId = `answer-to-question:${qid}`;
+    sse.addEventListener(eventId, async (event) => {
+      apiPollAnswers().catch((err) => {
+        console.error(err);
+      });
+    });
+  }
 
   let sessionJoined = false; // FIX: do better
-  let joinSession = async (sessionId: number, sessionCode: number) => {
+  let joinSession = async (sessionId: string, sessionCode: number) => {
     sessionJoined = true;
 
     // store the session id in workspace state
@@ -201,6 +199,10 @@ export async function activate(context: vscode.ExtensionContext) {
       }
 
       await questionManager.startQuestion(editor);
+      subscribeToAnswers(
+        context.workspaceState.get("cocodeSessionId", null) || "",
+        questionManager.getActiveQuestion()!.id,
+      );
       sidepanelViewProvider.updateQuestion(questionManager.getActiveQuestion());
       if (callback) {
         callback(true);
@@ -209,13 +211,13 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('cocode.acceptSuggestion', async () => {
+    vscode.commands.registerCommand("cocode.acceptSuggestion", async () => {
       if (!sessionJoined) {
-        vscode.window.showWarningMessage('No active session');
+        vscode.window.showWarningMessage("No active session");
         return;
       }
       if (sidepanelViewProvider.getChosenAnswerId() === null) {
-        vscode.window.showWarningMessage('No suggestion chosen');
+        vscode.window.showWarningMessage("No suggestion chosen");
         return;
       }
 
@@ -223,13 +225,13 @@ export async function activate(context: vscode.ExtensionContext) {
       answers = [];
       sidepanelViewProvider.updateQuestion(null);
       sidepanelViewProvider.updateAnswers([]);
-    })
+    }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('cocode.rejectSuggestions', async () => {
+    vscode.commands.registerCommand("cocode.rejectSuggestions", async () => {
       if (!sessionJoined) {
-        vscode.window.showWarningMessage('No active session');
+        vscode.window.showWarningMessage("No active session");
         return;
       }
       await questionManager.chooseAnswer(null);
@@ -237,36 +239,42 @@ export async function activate(context: vscode.ExtensionContext) {
       answers = [];
       sidepanelViewProvider.updateQuestion(null);
       sidepanelViewProvider.updateAnswers([]);
-    })
+    }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('cocode.deleteSuggestion', async (id: number) => {
-      if (!sessionJoined) {
-        vscode.window.showWarningMessage('No active session');
-        return;
-      }
+    vscode.commands.registerCommand(
+      "cocode.deleteSuggestion",
+      async (id: number) => {
+        if (!sessionJoined) {
+          vscode.window.showWarningMessage("No active session");
+          return;
+        }
 
-      const sessionId = context.workspaceState.get("cocodeSessionId", null);
-      const questionId = questionManager.getActiveQuestion()?.id;
+        const sessionId = context.workspaceState.get("cocodeSessionId", null);
+        const questionId = questionManager.getActiveQuestion()?.id;
 
-      if (!sessionId) {
-        vscode.window.showWarningMessage('No session id')
-        return
-      }
+        if (!sessionId) {
+          vscode.window.showWarningMessage("No session id");
+          return;
+        }
 
-      if (!questionId) {
-        vscode.window.showWarningMessage('No active question')
-        return;
-      }
+        if (!questionId) {
+          vscode.window.showWarningMessage("No active question");
+          return;
+        }
 
-      await fetch(`${baseUrl}/api/sessions/${sessionId}/questions/${questionId}/answers/${id}`, {
-        method: "DELETE"
-      });
+        await fetch(
+          `${baseUrl}/api/sessions/${sessionId}/questions/${questionId}/answers/${id}`,
+          {
+            method: "DELETE",
+          },
+        );
 
-      questionManager.chooseAnswer(null);
-    })
+        questionManager.chooseAnswer(null);
+      },
+    ),
   );
 }
 
-export function deactivate() {}
+export function deactivate() { }

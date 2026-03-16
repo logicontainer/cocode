@@ -1,6 +1,7 @@
 // app/actions.ts
 "use server";
 
+import { emitter } from "@/lib/eventEmitter";
 import { prisma } from "@/lib/prisma";
 
 export async function saveAnswerAction(text: string, questionId: string) {
@@ -23,8 +24,15 @@ export async function saveAnswerAction(text: string, questionId: string) {
         text: text?.trim() || null,
         question: { connect: { id: questionId } },
       },
-      select: { id: true, text: true, questionId: true },
+      select: { id: true, text: true, questionId: true, createdAt: true },
     });
+
+    const eventId = `answer-to-question:${question.id}`
+    console.log(eventId)
+    emitter.emit(eventId, {
+      message: "createdAnswer",
+      createdAt: created.createdAt,
+    })
 
     return { success: true, data: created };
   } catch (error) {
