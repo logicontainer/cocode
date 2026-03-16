@@ -3,11 +3,13 @@ import * as fs from 'fs';
 import { Answer } from '../types';
 import { State } from '../statemachine';
 
+export type ViewProviderState = State & { suggestionsVisible: boolean }
+
 export class ViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private html: string;
-  private extensionUri: vscode.Uri;
   private cocodeBaseUrl: string;
+  private extensionContext: vscode.ExtensionContext
   private jsFileContents: string
 
   private onChooseAnswer: (id: Answer["id"] | null) => void; // id = null means unselecting chosen answer
@@ -16,18 +18,18 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   constructor(
     htmlPath: string,
     jsPath: string,
-    extensionUri: vscode.Uri, 
+    extensionContext: vscode.ExtensionContext,
     onChooseAnswer: (id: Answer["id"] | null) => void,
     cocodeBaseUrl: string,
     requestUIUpdate: () => void,
   ) {
+    this.extensionContext = extensionContext
     this.requestUIUpdate = requestUIUpdate
     this.html = fs.readFileSync(htmlPath, 'utf-8');
     this.jsFileContents = fs.readFileSync(jsPath, 'utf-8')
       .split('\n')
       .filter(l => !l.includes('Object.defineProperty(exports') && !l.includes('use strict')) // remove stuff that tsc generates
       .join('\n');
-    this.extensionUri = extensionUri;
     this.onChooseAnswer = onChooseAnswer;
     this.cocodeBaseUrl = cocodeBaseUrl;
   }
@@ -37,7 +39,7 @@ export class ViewProvider implements vscode.WebviewViewProvider {
 
     const codiconsUri = webviewView.webview.asWebviewUri(
       vscode.Uri.joinPath(
-        this.extensionUri,
+        this.extensionContext.extensionUri,
         "node_modules",
         "@vscode/codicons",
         "dist",
@@ -80,8 +82,12 @@ export class ViewProvider implements vscode.WebviewViewProvider {
         vscode.commands.executeCommand('cocode.postQuestion');
       } else if (command === 'debug') {
         vscode.window.showInformationMessage(`[WEBVIEW DEBUG]: ${data.msg}`);
-      } else if (command === 'updateSuggestionsVisible') {
-        vscode.commands.executeCommand('updateSuggestionsVisible', data.visible)
+      } else if (command === 'toggleSuggestionsVisible') {
+        this.extensionContext.workspaceState.update(
+          "cocodeSuggestionsVisible", 
+          !this.extensionContext.workspaceState.get<boolean>("cocodeSuggestionsVisible")
+        )
+        this.requestUIUpdate()
       } else if (command === 'chooseAnswer') {
         this.onChooseAnswer(data.id)
       } else if (command === 'acceptSuggestion') {
@@ -99,7 +105,11 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   }
 
   updateView(state: State) {
-    this._view?.webview.postMessage({ command: 'updateState', state })
+    const vs = {
+      ...state,
+      suggestionsVisible: this.extensionContext.workspaceState.get<boolean>("cocodeSuggestionsVisible", true)
+    } satisfies ViewProviderState
+    this._view?.webview.postMessage({ command: 'updateState', state: vs })
   }
 
   private _getHtml(): string {

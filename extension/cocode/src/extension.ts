@@ -7,7 +7,7 @@ import { Answer, Question, QuestionPostResult, Session } from "./types";
 import { EventSource } from "eventsource";
 import { ViewProvider } from "./providers/view-provider";
 import { isInSession, isTakingSuggestions, StateMachineHandler } from "./statemachine";
-import { EditorHandler } from "./editor-handler";
+import { DocumentHandler } from "./document-handler";
 
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
@@ -16,11 +16,20 @@ const baseUrl = vscode.workspace
   .getConfiguration("cocode")
   .get("serverUrl", "https://cocode.kasperskov.dev");
 
+function ensureSuggestionsVisibleHasValue(context: vscode.ExtensionContext) {
+  const suggestionsVisible = context.workspaceState.get<boolean | null>("cocodeSuggestionsVisible", false)
+  if (suggestionsVisible === null) {
+    context.workspaceState.update("cocodeSuggestionsVisible", true)
+  }
+}
+
 export async function activate(context: vscode.ExtensionContext) {
   console.log("CoCode started");
 
-  const previousId = context.workspaceState.get("cocodeSessionId", null);
-  const previousCode = context.workspaceState.get("cocodeSessionCode", null);
+  ensureSuggestionsVisibleHasValue(context)
+
+  const previousId = context.workspaceState.get<Session["id"] | null>("cocodeSessionId", null);
+  const previousCode = context.workspaceState.get<Session["code"] | null>("cocodeSessionCode", null);
 
   const oldSessionExists = previousId !== null && previousCode !== null;
   vscode.commands.executeCommand(
@@ -97,7 +106,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const sidepanelViewProvider = new ViewProvider(
     viewHtmlPath,
     viewJsPath,
-    context.extensionUri,
+    context,
     onChooseAnswerInPanel,
     baseUrl,
     () => stateMachineHandler.forceUpdate()
@@ -110,7 +119,7 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
   );
 
-  let editorHandler: EditorHandler | null = null
+  let editorHandler: DocumentHandler | null = null
 
   const apiPollAnswers = async () => {
     const state = stateMachineHandler.currentState()
@@ -165,7 +174,7 @@ export async function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      editorHandler = new EditorHandler(editor)
+      editorHandler = DocumentHandler.fromEditor(editor)
 
       const range = editorHandler.getSelectedRange()
       if (!range) {

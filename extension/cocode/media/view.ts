@@ -1,5 +1,6 @@
 import { Answer } from "../src/types";
 import { State } from "../src/statemachine"
+import { ViewProviderState } from "../src/providers/view-provider";
 
 declare const COCODE_BASE_URL: string;
 declare const acquireVsCodeApi: () => { postMessage: (_: any) => void };
@@ -19,12 +20,10 @@ function debug(msg: string) {
   vscode.postMessage({ command: "debug", msg });
 }
 
-let suggestionsVisible = false;
-
 const buttonListeners: { [K in string]: (btn: HTMLButtonElement) => void } = {
 '#start-session-btn': () => vscode.postMessage({ command: 'StartSession' }),
 '#rejoin-session-btn': () => vscode.postMessage({ command: 'RejoinSession' }),
-'.divider': () => vscode.postMessage( { command: 'updateSuggestionsVisible', visible: !suggestionsVisible }),
+'.divider': () => vscode.postMessage( { command: 'toggleSuggestionsVisible' }),
 '#post-question-btn': () => vscode.postMessage({ command: 'postQuestion' }),
 '#accept-answer-btn': () => vscode.postMessage({ command: 'acceptSuggestion' }),
 '#reject-answer-btn': () => vscode.postMessage({ command: 'rejectSuggestions' }),
@@ -37,29 +36,6 @@ for (const [selector, func] of Object.entries(buttonListeners)) {
     btn.addEventListener("click", () => func(btn));
   }
 }
-
-// let chosenAnswerId: number | null = null
-// let currentQuestionLanguage: string | null = null;
-// updateQuestion(null, null);
-//
-// function updateQuestion(id: number | null, language: string | null) {
-//   currentQuestionLanguage = language 
-// }
-//
-// function updateChosenAnswer(id: number | null) {
-//   chosenAnswerId = id;
-//   const answerElements = document.querySelectorAll('.answer');
-//   answerElements.forEach(elm => {
-//     if (chosenAnswerId !== null && elm.id === `answer-${chosenAnswerId}`) {
-//       elm.classList.add('chosen');
-//     } else {
-//       elm.classList.remove('chosen');
-//     }
-//   });
-//   document.querySelector<HTMLButtonElement>('#accept-answer-btn')!.disabled = chosenAnswerId === null
-// }
-//
-//
 
 function chooseAnswer(id: Answer["id"] | null) { 
   vscode.postMessage({ command: 'chooseAnswer', id }) 
@@ -95,17 +71,69 @@ function setSessionCodeValue(code: number | null) {
   element.href = `${COCODE_BASE_URL}/answer?code=${code}`;
 }
 
+function setSuggestionsVisible(visible: boolean) {
+  const eyeElm = document.getElementById('eye-icon')!;
+  document.getElementById('answer-container')!.style.display = visible ? 'flex' : 'none';
+  if (visible) {
+    eyeElm.classList.remove('codicon-eye-closed');
+    eyeElm.classList.add('codicon-eye');
+  } else {
+    eyeElm.classList.remove('codicon-eye');
+    eyeElm.classList.add('codicon-eye-closed');
+  }
+}
+
+function renderAnswers(state: State & { enum: 'in session, taking suggestions' }) {
+  const trimAnswer = (text: string) => {
+    const lines = text.split('\n')
+    const minMargin = lines.map(l => l.length - l.trimStart().length)
+                           .reduce((a, b) => Math.min(a, b))
+    return lines.map(l => l.substring(minMargin)).join("\n")
+  }
+
+  const elements = state.suggestions.map(answer => {
+    const elm: HTMLElement = document.querySelector<HTMLTemplateElement>('#answer-template')!.content.firstElementChild!.cloneNode(true) as HTMLElement
+    elm.id = `answer-${answer.id}`
+1
+    if (answer.id === state.selectedSuggestionId) {
+      elm.classList.add('chosen');
+    }
+
+    const codeElement = elm.querySelector('.answer-code')!;
+    codeElement.textContent = trimAnswer(answer.text);
+    codeElement.classList.add(`language-${state.question.language}`);
+    elm.addEventListener('click', () => chooseAnswer(answer.id))
+    elm.querySelector('.answer-delete-icon')!.addEventListener('click', (e) => {
+      e.stopPropagation(); // prevent triggering the chooseAnswer event
+      vscode.postMessage({ command: 'deleteSuggestion', id: answer.id })
+    })
+    return elm
+  })
+
+  const container = document.querySelector('#answer-container')!
+  elements.forEach(elm => container.appendChild(elm))
+  hljs.highlightAll();
+
+  const answerCountElement = document.getElementById('answer-count')!;
+  answerCountElement.textContent = state.suggestions.length.toString();
+}
+
 window.addEventListener("message", (event) => {
   const { command, ...data } = event.data;
 
   if (command === 'updateState') {
-    const state = data.state as State
+    const state = data.state as ViewProviderState
+
+    setSuggestionsVisible(state.suggestionsVisible)
 
     // TODO: CLEAN up
     document.querySelector<HTMLButtonElement>('#post-question-btn')!.disabled = true
     document.querySelector<HTMLButtonElement>('#accept-answer-btn')!.disabled = true
     document.querySelector<HTMLButtonElement>('#reject-answer-btn')!.disabled = true
     document.querySelector<HTMLHeadingElement>('#answers-header')!.hidden = true
+
+    const container = document.querySelector('#answer-container')!
+    container.innerHTML = ""
 
     switch (state.enum) {
       case 'no session':
@@ -140,63 +168,16 @@ window.addEventListener("message", (event) => {
         disableStartSessionButton();
         disablePostQuestionButton();
 
-        document.querySelector<HTMLButtonElement>('#accept-answer-btn')!.disabled = state.selectedSuggestionId !== null
+        document.querySelector<HTMLButtonElement>('#accept-answer-btn')!.disabled = state.selectedSuggestionId === null
         document.querySelector<HTMLButtonElement>('#reject-answer-btn')!.disabled = false
         document.querySelector<HTMLHeadingElement>('#answers-header')!.hidden = false
-
-        const trimAnswer = (text: string) => {
-          const lines = text.split('\n')
-          const minMargin = lines.map(l => l.length - l.trimStart().length)
-                                 .reduce((a, b) => Math.min(a, b))
-          return lines.map(l => l.substring(minMargin)).join("\n")
-        }
-
-        const elements = state.suggestions.map(answer => {
-          const elm: HTMLElement = document.querySelector<HTMLTemplateElement>('#answer-template')!.content.firstElementChild!.cloneNode(true) as HTMLElement
-          elm.id = `answer-${answer.id}`
-
-          if (answer.id === state.selectedSuggestionId) {
-            elm.classList.add('chosen');
-          }
-
-          const codeElement = elm.querySelector('.answer-code')!;
-          codeElement.textContent = trimAnswer(answer.text);
-          codeElement.classList.add(`language-${state.question.language}`);
-          elm.addEventListener('click', () => chooseAnswer(answer.id))
-          elm.querySelector('.answer-delete-icon')!.addEventListener('click', (e) => {
-            e.stopPropagation(); // prevent triggering the chooseAnswer event
-            vscode.postMessage({ command: 'deleteSuggestion', id: answer.id })
-          })
-          return elm
-        })
-
-        const container = document.querySelector('#answer-container')!
-        container.innerHTML = ""
-        elements.forEach(elm => container.appendChild(elm))
-        hljs.highlightAll();
-
-        const answerCountElement = document.getElementById('answer-count')!;
-        answerCountElement.textContent = data.answers.length.toString();
-
+        renderAnswers(state)
         break;
     }
 
   } else {
     debug(`Unknown command ${command}`)
   }
-  //   case 'updateSuggestionsVisible':
-  //     const eyeElm = document.getElementById('eye-icon')!;
-  //     suggestionsVisible = data.visible;
-  //     document.getElementById('answer-container')!
-  //             .style.display = suggestionsVisible ? 'flex' : 'none';
-  //     if (suggestionsVisible) {
-  //       eyeElm.classList.remove('codicon-eye-closed');
-  //       eyeElm.classList.add('codicon-eye');
-  //     } else {
-  //       eyeElm.classList.remove('codicon-eye');
-  //       eyeElm.classList.add('codicon-eye-closed');
-  //     }
-  //     break;
 });
 
 
