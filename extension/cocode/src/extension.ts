@@ -5,8 +5,9 @@ import * as vscode from "vscode";
 import { Answer, Question, QuestionPostResult, Session } from "./types";
 
 import { EventSource } from "eventsource";
-import { QuestionManager } from "./questions";
 import { ViewProvider } from "./providers/view-provider";
+import { isInSession, isTakingSuggestions, StateMachineHandler } from "./statemachine";
+import { EditorHandler } from "./editor-handler";
 
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
@@ -28,22 +29,61 @@ export async function activate(context: vscode.ExtensionContext) {
     oldSessionExists,
   );
 
-  let answers: Answer[] = [];
-  const onChooseAnswerInPanel = (id: string | null) => {
-    if (id === null) {
-      questionManager.chooseAnswer(null);
-      return;
-    }
+  const stateMachineHandler = new StateMachineHandler(
+    { enum: 'no session', rejoinableSession: (oldSessionExists ? { id: previousId, code: previousCode } : null) },
+    {
+      onCreateSession: async () => {
+        // call end point to get code, and sessionid
+        const result = await fetch(`${baseUrl}/api/sessions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
 
-    const idx = answers.findIndex((a) => a.id === id);
-    if (idx === -1) {
-      vscode.window.showErrorMessage(`Answer with id ${id} doesn't exist.`);
-      return;
+        const session = (await result.json()) as Session;
+        context.workspaceState.update("cocodeSessionId", session.id)
+        context.workspaceState.update("cocodeSessionCode", session.code)
+        stateMachineHandler.handleServerSessionCreated(session)
+      },
+      onPoseQuestion: async (sessionId, question) => {
+        const res = await fetch(`${baseUrl}/api/sessions/${sessionId}/questions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...question,
+            fromLine: question.range.fromLine,
+            toLine: question.range.toLine,
+          }),
+        });
+
+        const { id: questionId } = (await res.json()) as QuestionPostResult;
+        stateMachineHandler.handleServerQuestionLoaded(questionId)
+        subscribeToAnswers(sessionId, questionId);
+      },
+      onDeleteSuggestion: (sessionId, questionId, suggId) => {
+        fetch(`${baseUrl}/api/sessions/${sessionId}/questions/${questionId}/answers/${suggId}`, {
+          method: "DELETE"
+        });
+      },
     }
-    const answer = answers[idx];
-    //vscode.window.showInformationMessage(`Chose answer ${answer}`);
-    questionManager.chooseAnswer(answer);
+  )
+
+  const setInSessionBool = (b: boolean) => vscode.commands.executeCommand("setContext", "cocode.inSession", b);
+  stateMachineHandler.attach({
+    onStateUpdate: state => {
+      setInSessionBool(isInSession(state))
+      sidepanelViewProvider.updateView(state)
+      editorHandler?.updateEditor(state)
+    },
+  })
+
+  const onChooseAnswerInPanel = (id: Answer["id"] | null) => {
+    stateMachineHandler.editorSelectSuggestion(id)
   };
+
 
   const viewHtmlPath = path.join(context.extensionPath, "media", "view.html");
 
@@ -57,10 +97,10 @@ export async function activate(context: vscode.ExtensionContext) {
   const sidepanelViewProvider = new ViewProvider(
     viewHtmlPath,
     viewJsPath,
-    (oldSessionExists && previousCode) || null,
     context.extensionUri,
     onChooseAnswerInPanel,
     baseUrl,
+    () => stateMachineHandler.forceUpdate()
   );
 
   context.subscriptions.push(
@@ -70,210 +110,95 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
   );
 
-  const apiPostQuestion = async (question: Omit<Question, "id">) => {
-    const sessionId = context.workspaceState.get("cocodeSessionId", null);
-    const res = await fetch(`${baseUrl}/api/sessions/${sessionId}/questions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(question),
-    });
-    return (await res.json()) as QuestionPostResult;
-  };
-
-  const questionManager = new QuestionManager(apiPostQuestion);
+  let editorHandler: EditorHandler | null = null
 
   const apiPollAnswers = async () => {
-    const sessionId = context.workspaceState.get("cocodeSessionId", null);
-    const question = questionManager.getActiveQuestion();
-
-    if (!sessionId || !question) {
+    const state = stateMachineHandler.currentState()
+    if (!isTakingSuggestions(state))
       return;
-    }
 
-    fetch(`${baseUrl}/api/sessions/${sessionId}/questions/${question.id}/answers`)
-      .then((res) => {
-        return res.json();
-      })
-      .then((answers: Answer[]) => {
-        sidepanelViewProvider.updateAnswers(answers);
-      })
-      .catch((err) => {
-        console.error(err);
-      });
+    const { session, question } = state
+
+    const res = await fetch(`${baseUrl}/api/sessions/${session.id}/questions/${question.id}/answers`)
+    const answers: Answer[] = (await res.json()) as Answer[]
+    stateMachineHandler.handleServerSuggestionsUpdated(answers)
   };
 
   function subscribeToAnswers(sid: string, qid: string) {
     const url = `${baseUrl}/api/events/sessions/${sid}/questions/${qid}/answers`;
     const sse = new EventSource(url);
-
     // Listen for the custom 'answer-to-question' event we defined in our Next.js stream
     const eventId = `answer-to-question:${qid}`;
-    sse.addEventListener(eventId, async (event) => {
+    sse.addEventListener(eventId, async _ => {
       apiPollAnswers().catch((err) => {
         console.error(err);
       });
     });
   }
 
-  let sessionJoined = false; // FIX: do better
-  let joinSession = async (sessionId: string, sessionCode: number) => {
-    sessionJoined = true;
-
-    // store the session id in workspace state
-    await vscode.commands.executeCommand(
-      "setContext",
-      "cocode.inSession",
-      true,
-    );
-    await context.workspaceState.update("cocodeSessionId", sessionId);
-    await context.workspaceState.update("cocodeSessionCode", sessionCode);
-
-    sidepanelViewProvider.updateSessionCode(sessionCode);
-    sidepanelViewProvider.updateAnswers([]);
-    sidepanelViewProvider.showAnswerPage();
-  };
-
   // register command to rejoin previous session
   context.subscriptions.push(
     vscode.commands.registerCommand("cocode.rejoinSession", () => {
-      const sessionId = context.workspaceState.get("cocodeSessionId", null);
-      const sessionCode = context.workspaceState.get("cocodeSessionCode", null);
-
-      if (sessionId && sessionCode) {
-        joinSession(sessionId, sessionCode);
-      } else {
-        vscode.window.showErrorMessage("No previous session found.");
-      }
+      stateMachineHandler.editorRejoinSession()
     }),
   );
 
   // register command to start a new  session
   context.subscriptions.push(
-    vscode.commands.registerCommand("cocode.startSession", async (callback) => {
-      // call end point to get code, and sessionid
-      const result = await fetch(`${baseUrl}/api/sessions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      const { id: sessionId, code: sessionCode } =
-        (await result.json()) as Session;
-      joinSession(sessionId, sessionCode);
-      if (callback) {
-        callback();
-      }
+    vscode.commands.registerCommand("cocode.startSession", () => {
+      stateMachineHandler.editorCreateSession()
     }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("cocode.postQuestion", async (callback) => {
+    vscode.commands.registerCommand("cocode.postQuestion", () => {
       const editor = vscode.window.activeTextEditor;
+      const state = stateMachineHandler.currentState()
+
+      if (!isInSession(state)) {
+        vscode.window.showWarningMessage("No active session.");
+        return;
+      }
 
       if (!editor) {
         vscode.window.showWarningMessage("No active file.");
-        if (callback) {
-          callback(false);
-        }
         return;
       }
 
-      if (!sessionJoined) {
-        vscode.window.showWarningMessage("No active session");
-        if (callback) {
-          callback(false);
-        }
+      editorHandler = new EditorHandler(editor)
+
+      const range = editorHandler.getSelectedRange()
+      if (!range) {
+        console.assert(false, "This should be impossible")
         return;
       }
 
-      if (questionManager.getActiveQuestion()) {
-        vscode.window.showWarningMessage(
-          "There is an active unanswered question",
-        );
-        if (callback) {
-          callback(false);
-        }
-        return;
-      }
+      const question = {
+        range: range,
+        content: editorHandler.getFullEditorContent(),
+        language: editor.document.languageId,
+      } satisfies Omit<Question, "id">
 
-      await questionManager.startQuestion(editor);
-      subscribeToAnswers(
-        context.workspaceState.get("cocodeSessionId", null) || "",
-        questionManager.getActiveQuestion()!.id,
-      );
-      sidepanelViewProvider.updateQuestion(questionManager.getActiveQuestion());
-      if (callback) {
-        callback(true);
-      }
+      stateMachineHandler.editorPoseQuestion(question)
     }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("cocode.acceptSuggestion", async () => {
-      if (!sessionJoined) {
-        vscode.window.showWarningMessage("No active session");
-        return;
-      }
-      if (sidepanelViewProvider.getChosenAnswerId() === null) {
-        vscode.window.showWarningMessage("No suggestion chosen");
-        return;
-      }
-
-      questionManager.endQuestion();
-      answers = [];
-      sidepanelViewProvider.updateQuestion(null);
-      sidepanelViewProvider.updateAnswers([]);
-    }),
+    vscode.commands.registerCommand('cocode.acceptSuggestion', () => {
+      stateMachineHandler.editorAcceptSelectedSuggestion()
+    })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("cocode.rejectSuggestions", async () => {
-      if (!sessionJoined) {
-        vscode.window.showWarningMessage("No active session");
-        return;
-      }
-      await questionManager.chooseAnswer(null);
-      questionManager.endQuestion();
-      answers = [];
-      sidepanelViewProvider.updateQuestion(null);
-      sidepanelViewProvider.updateAnswers([]);
-    }),
+    vscode.commands.registerCommand('cocode.rejectSuggestions', () => {
+      stateMachineHandler.editorRejectSuggestions()
+    })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand(
-      "cocode.deleteSuggestion",
-      async (id: number) => {
-        if (!sessionJoined) {
-          vscode.window.showWarningMessage("No active session");
-          return;
-        }
-
-        const sessionId = context.workspaceState.get("cocodeSessionId", null);
-        const questionId = questionManager.getActiveQuestion()?.id;
-
-        if (!sessionId) {
-          vscode.window.showWarningMessage("No session id");
-          return;
-        }
-
-        if (!questionId) {
-          vscode.window.showWarningMessage("No active question");
-          return;
-        }
-
-        await fetch(
-          `${baseUrl}/api/sessions/${sessionId}/questions/${questionId}/answers/${id}`,
-          {
-            method: "DELETE",
-          },
-        );
-
-        questionManager.chooseAnswer(null);
-      },
-    ),
+    vscode.commands.registerCommand('cocode.deleteSuggestion', (id: Answer["id"]) => {
+      stateMachineHandler.editorDeleteSuggestion(id)
+    })
   );
 }
 
