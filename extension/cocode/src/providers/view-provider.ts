@@ -1,36 +1,42 @@
-import * as vscode from 'vscode';
-import * as fs from 'fs';
-import { Answer, Question } from '../types';
+import * as fs from "fs";
+import * as vscode from "vscode";
+
+import { Answer, Question } from "../types";
 
 export class ViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private html: string;
   private extensionUri: vscode.Uri;
   private cocodeBaseUrl: string;
-  private onChooseAnswer: (id: number | null) => void; // id = null means unselecting chosen answer
+  private onChooseAnswer: (id: string | null) => void; // id = null means unselecting chosen answer
 
   private rejoinableSessionCode: number | null = null;
   private answers: Answer[] = [];
-  private blackListAnswerIds: Set<number> = new Set();
+  private blackListAnswerIds: Set<string> = new Set();
   private sessionCode: number | null = null;
-  private chosenAnswerId: number | null = null;
+  private chosenAnswerId: string | null = null;
   private question: Question | null = null;
   private suggestionsVisible: boolean = false;
-  private jsFileContents: string
+  private jsFileContents: string;
 
   constructor(
-    htmlPath: string, 
+    htmlPath: string,
     jsPath: string,
     rejoinableSessionCode: number | null,
-    extensionUri: vscode.Uri, 
-    onChooseAnswer: (id: number | null) => void,
+    extensionUri: vscode.Uri,
+    onChooseAnswer: (id: string | null) => void,
     cocodeBaseUrl: string,
   ) {
-    this.html = fs.readFileSync(htmlPath, 'utf-8');
-    this.jsFileContents = fs.readFileSync(jsPath, 'utf-8')
-      .split('\n')
-      .filter(l => !l.includes('Object.defineProperty(exports') && !l.includes('use strict')) // remove stuff that tsc generates
-      .join('\n');
+    this.html = fs.readFileSync(htmlPath, "utf-8");
+    this.jsFileContents = fs
+      .readFileSync(jsPath, "utf-8")
+      .split("\n")
+      .filter(
+        (l) =>
+          !l.includes("Object.defineProperty(exports") &&
+          !l.includes("use strict"),
+      ) // remove stuff that tsc generates
+      .join("\n");
     this.extensionUri = extensionUri;
     this.onChooseAnswer = onChooseAnswer;
     this.rejoinableSessionCode = rejoinableSessionCode;
@@ -40,65 +46,87 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   resolveWebviewView(webviewView: vscode.WebviewView) {
     this._view = webviewView;
 
-    const codiconsUri = webviewView.webview
-      .asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', '@vscode/codicons', 'dist', 'codicon.css'));
+    const codiconsUri = webviewView.webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this.extensionUri,
+        "node_modules",
+        "@vscode/codicons",
+        "dist",
+        "codicon.css",
+      ),
+    );
 
     let codeCompletionStylesheet = null;
     if (vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark) {
       codeCompletionStylesheet = "atom-one-dark";
-    } else if (vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Light) {
+    } else if (
+      vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Light
+    ) {
       codeCompletionStylesheet = "atom-one-light";
     } else {
       codeCompletionStylesheet = "atom-one-dark";
     }
 
     webviewView.webview.options = { enableScripts: true };
-    webviewView.webview.html = this._getHtml()      
+    webviewView.webview.html = this._getHtml()
       .replaceAll("{{CODEICONS_URI_MAGICAL_STRING}}", codiconsUri.toString())
-      .replaceAll("{{CODE_COMPLETION_STYLESHEET_MAGICAL_STRING}}", codeCompletionStylesheet)
+      .replaceAll(
+        "{{CODE_COMPLETION_STYLESHEET_MAGICAL_STRING}}",
+        codeCompletionStylesheet,
+      )
       .replaceAll("{{COCODE_BASE_URL}}", this.cocodeBaseUrl)
-      .replaceAll("{{COCODE_BASE_SHORT_URL}}", this.cocodeBaseUrl.replaceAll("https://", "").replaceAll("http://", ""))
+      .replaceAll(
+        "{{COCODE_BASE_SHORT_URL}}",
+        this.cocodeBaseUrl.replaceAll("https://", "").replaceAll("http://", ""),
+      )
       .replaceAll("{{COCODE_VIEWJS_FILE_CONTENTS}}", this.jsFileContents);
 
     // Handle messages sent from the webview
     webviewView.webview.onDidReceiveMessage(({ command, ...data }) => {
-      if (command === 'StartSession') {
-        vscode.commands.executeCommand('cocode.startSession', () => {
-          webviewView.webview.postMessage({ command: 'enableStartSessionButton' });
+      if (command === "StartSession") {
+        vscode.commands.executeCommand("cocode.startSession", () => {
+          webviewView.webview.postMessage({
+            command: "enableStartSessionButton",
+          });
         });
-      } else if (command === 'RejoinSession') {
-        vscode.commands.executeCommand('cocode.rejoinSession');
-      } else if(command === 'postQuestion') {
-        vscode.commands.executeCommand('cocode.postQuestion', (success: boolean) => {
-          webviewView.webview.postMessage({ command: 'enablePostQuestionButton' });
-        });
-      } else if (command === 'debug') {
+      } else if (command === "RejoinSession") {
+        vscode.commands.executeCommand("cocode.rejoinSession");
+      } else if (command === "postQuestion") {
+        vscode.commands.executeCommand(
+          "cocode.postQuestion",
+          (success: boolean) => {
+            webviewView.webview.postMessage({
+              command: "enablePostQuestionButton",
+            });
+          },
+        );
+      } else if (command === "debug") {
         vscode.window.showInformationMessage(`[WEBVIEW DEBUG]: ${data.msg}`);
-      } else if (command === 'updateSuggestionsVisible') {
+      } else if (command === "updateSuggestionsVisible") {
         this.updateSuggestionVisible(data.visible);
-      } else if (command === 'chooseAnswer') {
+      } else if (command === "chooseAnswer") {
         this.chosenAnswerId = data.id;
-        this.onChooseAnswer(data.id)
-      } else if (command === 'acceptSuggestion') {
-        vscode.commands.executeCommand('cocode.acceptSuggestion');
-      } else if (command === 'rejectSuggestions') {
-        vscode.commands.executeCommand('cocode.rejectSuggestions');
-      } else if (command === 'deleteSuggestion') {
-        this.blackListAnswerIds.add(data.id)
+        this.onChooseAnswer(data.id);
+      } else if (command === "acceptSuggestion") {
+        vscode.commands.executeCommand("cocode.acceptSuggestion");
+      } else if (command === "rejectSuggestions") {
+        vscode.commands.executeCommand("cocode.rejectSuggestions");
+      } else if (command === "deleteSuggestion") {
+        this.blackListAnswerIds.add(data.id);
         this.sendAnswersToWebview();
-        vscode.commands.executeCommand('cocode.deleteSuggestion', data.id)
+        vscode.commands.executeCommand("cocode.deleteSuggestion", data.id);
       }
     });
 
     webviewView.onDidChangeVisibility(() => {
-      this.updateView()
+      this.updateView();
     });
 
-    this.updateView()
+    this.updateView();
   }
 
   private updateView() {
-    if(this.sessionCode) {
+    if (this.sessionCode) {
       this.showAnswerPage();
     }
     this.sendRejoinableSessionCodeToWebview();
@@ -109,26 +137,31 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   }
 
   private sendRejoinableSessionCodeToWebview(): void {
-    this._view?.webview?.postMessage({ command: 'setRejoinableSessionCode', code: this.rejoinableSessionCode })
+    this._view?.webview?.postMessage({
+      command: "setRejoinableSessionCode",
+      code: this.rejoinableSessionCode,
+    });
   }
 
   private sendSessionCodeToWebview(): void {
     if (this._view) {
-      this._view.webview.postMessage({ command: 'setSessionCode', code: this.sessionCode });
+      this._view.webview.postMessage({
+        command: "setSessionCode",
+        code: this.sessionCode,
+      });
     }
   }
 
   private sendAnswersToWebview(): void {
-
     let filteredAnswers = this.answers.filter(
-      answer => !this.blackListAnswerIds.has(answer.id) 
+      (answer) => !this.blackListAnswerIds.has(answer.id),
     );
 
     if (this._view) {
       this._view.webview.postMessage({
-        command: 'updateAnswers',
+        command: "updateAnswers",
         answers: filteredAnswers,
-        chosenAnswerId: this.chosenAnswerId
+        chosenAnswerId: this.chosenAnswerId,
       });
     }
   }
@@ -136,9 +169,9 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   private sendQuestionIdToWebview(): void {
     if (this._view) {
       this._view.webview.postMessage({
-        command: 'updateQuestion',
+        command: "updateQuestion",
         id: this.question?.id || null,
-        language: this.question?.language || "javascript"
+        language: this.question?.language || "javascript",
       });
     }
   }
@@ -146,8 +179,8 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   private sendSuggestionsVisibleToWebview(): void {
     if (this._view) {
       this._view.webview.postMessage({
-        command: 'updateSuggestionsVisible',
-        visible: this.suggestionsVisible
+        command: "updateSuggestionsVisible",
+        visible: this.suggestionsVisible,
       });
     }
   }
@@ -177,21 +210,21 @@ export class ViewProvider implements vscode.WebviewViewProvider {
 
   showAnswerPage() {
     if (this._view) {
-      this._view.webview.postMessage({ command: 'showAnswerPage' });
+      this._view.webview.postMessage({ command: "showAnswerPage" });
     }
   }
 
   showStartSessionPage() {
     if (this._view) {
-      this._view.webview.postMessage({ command: 'showStartSessionPage' });
+      this._view.webview.postMessage({ command: "showStartSessionPage" });
     }
   }
 
   private _getHtml(): string {
-	  return this.html;
+    return this.html;
   }
 
-  getChosenAnswerId(): number | null {
+  getChosenAnswerId(): string | null {
     return this.chosenAnswerId;
   }
 }

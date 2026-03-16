@@ -1,19 +1,48 @@
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
-  const supabase = createClient(await cookies())
-  const { code: codeString } = await params
-  const code = parseInt(codeString)
+import { prisma } from "@/lib/prisma";
 
-  const { error, data } = await supabase.rpc("get_latest_question_by_code", { p_code: code }).select("id")
-  if (error !== null) {
-    console.error("Supabase error", error)
-    return NextResponse.json(error, { status: 500 });
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ code: string }> },
+) {
+  try {
+    const { code: codeString } = await params;
+    if (!codeString) {
+      return NextResponse.json({ error: "Missing code" }, { status: 400 });
+    }
+
+    const code = Number(codeString);
+    if (Number.isNaN(code)) {
+      return NextResponse.json({ error: "Invalid code" }, { status: 400 });
+    }
+
+    const latestQuestion = await prisma.question.findFirst({
+      where: {
+        session: {
+          code,
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    if (!latestQuestion) {
+      return NextResponse.json(
+        { error: "No question found for code", code },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json(latestQuestion, { status: 200 });
+  } catch (error) {
+    console.error("questions/current GET error", error);
+    const message =
+      error instanceof Error ? error.message : "Unknown server error";
+    return NextResponse.json(
+      { error: "Failed to get latest question for code", message },
+      { status: 500 },
+    );
   }
-
-  const [{ id }] = data
-
-  return NextResponse.json({ id })
 }

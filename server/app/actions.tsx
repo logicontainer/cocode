@@ -1,26 +1,44 @@
 // app/actions.ts
-'use server'
+"use server";
 
-// Adjust this import based on how you initialize Supabase in your project 
-// (e.g., using @supabase/ssr or @supabase/supabase-js)
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { emitter } from "@/lib/eventEmitter";
+import { prisma } from "@/lib/prisma";
 
-export async function saveAnswerAction(text: string, questionId: number) {
-  const supabase = createClient(await cookies())
+export async function saveAnswerAction(text: string, questionId: string) {
+  try {
+    if (!questionId) {
+      throw new Error("Missing questionId");
+    }
 
+    const question = await prisma.question.findUnique({
+      where: { id: questionId },
+      select: { id: true },
+    });
 
-  // Example: Insert the content into a 'snippets' table
-  const { data, error } = await supabase
-    .from('Answer')
-    .insert({ question_id: questionId, text })
-    .select()
+    if (!question) {
+      return { success: false, error: "Question not found" };
+    }
 
-  if (error) {
-    console.error("Supabase Error:", error)
-    throw new Error('Failed to save data')
+    const created = await prisma.answer.create({
+      data: {
+        text: text?.trim() || null,
+        question: { connect: { id: questionId } },
+      },
+      select: { id: true, text: true, questionId: true, createdAt: true },
+    });
+
+    const eventId = `answer-to-question:${question.id}`
+    console.log(eventId)
+    emitter.emit(eventId, {
+      message: "createdAnswer",
+      createdAt: created.createdAt,
+    })
+
+    return { success: true, data: created };
+  } catch (error) {
+    console.error("saveAnswerAction error", error);
+    const message =
+      error instanceof Error ? error.message : "Unknown server error";
+    return { success: false, error: message };
   }
-
-  // You can optionally return data back to the client
-  return { success: true, data }
 }

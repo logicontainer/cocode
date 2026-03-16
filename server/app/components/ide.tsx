@@ -1,32 +1,31 @@
 "use client";
-import { useEffect, useRef } from 'react';
 
-import MonacoEditor, { OnMount } from '@monaco-editor/react';
-import type { editor } from 'monaco-editor';
-import type { Database } from '@/utils/supabase/database.types';
-/* @ts-ignore */
-import { constrainedEditor } from 'constrained-editor-plugin';
 import "./editor-styles.css";
 
-type QuestionRow = Database["public"]["Tables"]["Question"]["Row"];
+import MonacoEditor, { OnMount } from "@monaco-editor/react";
+import { useEffect, useRef } from "react";
+
+import { QuestionModel } from "@/lib/generated/prisma/models";
+/* @ts-ignore */
+import { constrainedEditor } from "constrained-editor-plugin";
+import type { editor } from "monaco-editor";
 
 export default function IDE({
   question,
-  onChangeUserAnswer
+  onChangeUserAnswer,
 }: {
-  question: QuestionRow;
+  question: QuestionModel;
   onChangeUserAnswer: (answer: string) => void;
 }) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<typeof import('monaco-editor') | null>(null);
+  const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
   const selectionListenerRef = useRef<{ dispose: () => void } | null>(null);
   const constrainedInstanceRef = useRef<any>(null);
 
   // Calculate the immutable line counts
   const initialTotalLines = question.content.split(/\r?\n/).length;
-  const fromLine = Math.min(question.from_line || 1, initialTotalLines)
-  const toLine = Math.min(question.to_line || 2, initialTotalLines + 1)
-  console.log(fromLine, toLine)
+  const fromLine = Math.min(question.fromLine || 1, initialTotalLines);
+  const toLine = Math.min(question.toLine || 2, initialTotalLines + 1);
   const topReadonlyCount = fromLine - 1;
   const bottomReadonlyCount = Math.max(0, initialTotalLines - toLine + 1);
 
@@ -38,10 +37,10 @@ export default function IDE({
 
     const userCodeLines = currentLines.slice(
       topReadonlyCount,
-      currentLines.length - bottomReadonlyCount
+      currentLines.length - bottomReadonlyCount,
     );
 
-    return userCodeLines.join('\n');
+    return userCodeLines.join("\n");
   };
 
   const setupEditorForQuestion = () => {
@@ -57,12 +56,18 @@ export default function IDE({
       oldModel.dispose();
     }
 
-    const newModel = monaco.editor.createModel(question.content, question.language || "javascript");
+    const newModel = monaco.editor.createModel(
+      question.content,
+      question.language || "javascript",
+    );
     editor.setModel(newModel);
 
     constrainedInstance.initializeIn(editor);
     editor.focus();
-    editor.updateOptions({ minimap: { enabled: false }, scrollBeyondLastLine: false })
+    editor.updateOptions({
+      minimap: { enabled: false },
+      scrollBeyondLastLine: false,
+    });
 
     const initialPosition = { lineNumber: fromLine || 1, column: 1 };
     editor.setPosition(initialPosition);
@@ -74,25 +79,30 @@ export default function IDE({
       const endColumn = newModel.getLineMaxColumn(toLine - 1);
       const range = [fromLine, 1, toLine - 1, endColumn];
 
-      const restrictions = [{
-        range,
-        allowMultiline: true,
-        label: "editableRegion"
-      }];
+      const restrictions = [
+        {
+          range,
+          allowMultiline: true,
+          label: "editableRegion",
+        },
+      ];
 
       constrainedInstance.addRestrictionsTo(newModel, restrictions);
 
       // --- 1. Track the editable decoration separately ---
       // By putting this in its own collection, we can query its dynamic range later
-      const editableAreaDecoration = editor.createDecorationsCollection([{
-        range: new monaco.Range(range[0], range[1], range[2], range[3]),
-        options: {
-          isWholeLine: true,
-          className: "editable-area-highlight",
-          marginClassName: "editable-area-margin",
-          stickiness: monaco.editor.TrackedRangeStickiness.AlwaysGrowsWhenTypingAtEdges
-        }
-      }]);
+      const editableAreaDecoration = editor.createDecorationsCollection([
+        {
+          range: new monaco.Range(range[0], range[1], range[2], range[3]),
+          options: {
+            isWholeLine: true,
+            className: "editable-area-highlight",
+            marginClassName: "editable-area-margin",
+            stickiness:
+              monaco.editor.TrackedRangeStickiness.AlwaysGrowsWhenTypingAtEdges,
+          },
+        },
+      ]);
 
       // --- 2. Add the Dimmed Decorations ---
       const dimmedDecorations = [];
@@ -100,27 +110,39 @@ export default function IDE({
 
       if (fromLine > 1) {
         dimmedDecorations.push({
-          range: new monaco.Range(1, 1, fromLine - 1, newModel.getLineMaxColumn(fromLine - 1)),
+          range: new monaco.Range(
+            1,
+            1,
+            fromLine - 1,
+            newModel.getLineMaxColumn(fromLine - 1),
+          ),
           options: {
             isWholeLine: true,
-            className: 'dimmed-area-highlight',
+            className: "dimmed-area-highlight",
             inlineClassName: "dimmed-code",
             marginClassName: "dimmed-margin",
-            stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
-          }
+            stickiness:
+              monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+          },
         });
       }
 
       if (toLine <= lineCount) {
         dimmedDecorations.push({
-          range: new monaco.Range(toLine, 1, lineCount, newModel.getLineMaxColumn(lineCount)),
+          range: new monaco.Range(
+            toLine,
+            1,
+            lineCount,
+            newModel.getLineMaxColumn(lineCount),
+          ),
           options: {
             isWholeLine: true,
-            className: 'dimmed-area-highlight',
+            className: "dimmed-area-highlight",
             inlineClassName: "dimmed-code",
             marginClassName: "dimmed-margin",
-            stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
-          }
+            stickiness:
+              monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+          },
         });
       }
 
@@ -142,12 +164,11 @@ export default function IDE({
         const isOutside = selections.some(
           (sel) =>
             sel.startLineNumber < currentEditableRange.startLineNumber ||
-            sel.endLineNumber > currentEditableRange.endLineNumber
+            sel.endLineNumber > currentEditableRange.endLineNumber,
         );
 
         editor.updateOptions({ readOnly: isOutside });
       });
-
     } else {
       editor.updateOptions({ readOnly: true });
     }
@@ -175,30 +196,34 @@ export default function IDE({
     onChangeUserAnswer(extractUserAnswer());
   }
 
-  return (
-    (question ?
-      <MonacoEditor
-        defaultLanguage="javascript"
-        onMount={handleEditorDidMount}
-        onChange={handleChange}
-        options={{
-          automaticLayout: true,
-          fixedOverflowWidgets: true, // <-- The magic fix!
-        }}
-      /> : <div>Waiting for the presenter to post a question ...</div >)
+  return question ? (
+    <MonacoEditor
+      defaultLanguage="javascript"
+      onMount={handleEditorDidMount}
+      onChange={handleChange}
+      options={{
+        automaticLayout: true,
+        fixedOverflowWidgets: true, // <-- The magic fix!
+      }}
+    />
+  ) : (
+    <div>Waiting for the presenter to post a question ...</div>
   );
 }
 
-
 /**
-* Extracts a specific range of lines from a multi-line string.
-*
-* @param {string} text - The full multi-line string.
-* @param {number} fromLine - The starting line number (1-indexed, inclusive).
-* @param {number} toLine - The ending line number (1-indexed, exclusive).
-* @returns {string} The extracted lines.
-*/
-export function extractLineRange(text: string, fromLine: number, toLine: number) {
+ * Extracts a specific range of lines from a multi-line string.
+ *
+ * @param {string} text - The full multi-line string.
+ * @param {number} fromLine - The starting line number (1-indexed, inclusive).
+ * @param {number} toLine - The ending line number (1-indexed, exclusive).
+ * @returns {string} The extracted lines.
+ */
+export function extractLineRange(
+  text: string,
+  fromLine: number,
+  toLine: number,
+) {
   if (!text) return "";
 
   const lines = text.split(/\r?\n/);
@@ -210,5 +235,5 @@ export function extractLineRange(text: string, fromLine: number, toLine: number)
   // slice(start, end) includes start and excludes end
   const extractedLines = lines.slice(startIndex, endIndex);
 
-  return extractedLines.join('\n');
+  return extractedLines.join("\n");
 }

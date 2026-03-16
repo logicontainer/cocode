@@ -1,35 +1,53 @@
-import { Answer } from "@/types/api";
-import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { text } from "stream/consumers";
 
-export async function GET(_: NextRequest, { params }: { params: Promise<{ sid: string; qid: string }> }) {
-  const supabase = createClient(await cookies())
-  const { sid: sessionIdString, qid: questionIdString } = await params
-  const sessionId = parseInt(sessionIdString)
-  const questionId = parseInt(questionIdString)
+import { Answer } from "@/types/api";
+import { prisma } from "@/lib/prisma";
 
-  console.log(`Getting answers for session ${sessionId}, question ${questionId}`)
+export async function GET(
+  _: NextRequest,
+  { params }: { params: Promise<{ sid: string; qid: string }> },
+) {
+  try {
+    const { sid: sessionId, qid: questionId } = await params;
 
-  const { error, data } = await supabase
-    .from("Session")
-    .select(`id, Question ( *, Answer ( * ) )`)
-    .eq("id", sessionId)
-    .eq("Question.id", questionId)
+    if (!sessionId || !questionId) {
+      return NextResponse.json(
+        { error: "Missing sessionId or questionId" },
+        { status: 400 },
+      );
+    }
 
-  if (error !== null) {
-    console.error("Supabase error", error)
-    return NextResponse.json(error, { status: 500 });
+    const question = await prisma.question.findFirst({
+      where: {
+        id: questionId,
+        sessionId: sessionId,
+      },
+      include: {
+        answers: true,
+      },
+    });
+
+    if (!question) {
+      return NextResponse.json(
+        { error: "Question not found for this session" },
+        { status: 404 },
+      );
+    }
+
+    const answers: Answer[] = question.answers.map((a) => ({
+      id: a.id,
+      text: a.text ?? "",
+    }));
+
+    return NextResponse.json(answers);
+  } catch (error) {
+    console.error("answers GET error", error);
+
+    const message =
+      error instanceof Error ? error.message : "Unknown server error";
+    return NextResponse.json(
+      { error: "Failed to get answers", message },
+      { status: 500 },
+    );
   }
-
-  const answers: Answer[] =
-    data.flatMap(s => s.Question)
-      .flatMap(s => s.Answer)
-      .flatMap(a => ({
-        id: a.id,
-        text: a.text ?? "",
-      }))
-
-  return NextResponse.json(answers)
 }

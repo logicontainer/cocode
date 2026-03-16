@@ -1,6 +1,6 @@
 import z from "zod";
 
-export const idSchema = z.int()
+export const idSchema = z.string();
 
 export const questionSchema = z.object({
   id: idSchema,
@@ -8,17 +8,17 @@ export const questionSchema = z.object({
   fromLine: z.int().nonnegative(),
   toLine: z.int().nonnegative(),
   language: z.string().optional(),
-})
+});
 
-export const questionNoIdSchema = questionSchema.omit({ id: true })
+export const questionNoIdSchema = questionSchema.omit({ id: true });
 
 export const answerSchema = z.object({
   id: idSchema,
-  text: z.string()
-})
+  text: z.string(),
+});
 
-export const answerNoIdSchema = answerSchema.omit({ id: true })
+export const answerNoIdSchema = answerSchema.omit({ id: true });
 
-export type Session = { id: number; code: number }
-export type Question = z.infer<typeof questionSchema>
-export type Answer = z.infer<typeof answerSchema>
+export type Session = { id: string; code: number };
+export type Question = z.infer<typeof questionSchema>;
+export type Answer = z.infer<typeof answerSchema>;

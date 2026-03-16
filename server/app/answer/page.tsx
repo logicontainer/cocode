@@ -1,32 +1,35 @@
-// page.tsx
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
-import RealtimeAnswer from '../components/realtime-answer'; // <-- Import the new component
+import RealtimeAnswer from "../components/realtime-answer";
+import { prisma } from "@/lib/prisma";
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ code?: number }> }) {
-  const { code } = await searchParams;
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>;
+}) {
+  const { code: codeParam } = await searchParams;
 
-  if (!code) {
-    return <p>No code was provided</p>
+  if (!codeParam) {
+    return <p>No code was provided</p>;
   }
 
-  const supabase = createClient(await cookies())
-
-  // Fetch the initial state for an instant page load
-  const { data: initialQuestion, error } = await supabase
-    .rpc('get_latest_question_by_code', { p_code: code })
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error fetching question:', error);
+  const code = Number(codeParam);
+  if (Number.isNaN(code) || !Number.isInteger(code)) {
+    return <p>Invalid code value: {codeParam}</p>;
   }
 
-  return (
-    <>
-      <RealtimeAnswer
-        code={code}
-        initialQuestion={initialQuestion}
-      />
-    </>
-  )
+  try {
+    const latestQuestion = await prisma.question.findFirst({
+      where: { session: { code } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!latestQuestion) {
+      return <p>No question found for code {code}</p>;
+    }
+
+    return <RealtimeAnswer code={code} initialQuestion={latestQuestion} />;
+  } catch (error) {
+    console.error("Error fetching latest question by code:", error);
+    return <p>Failed to load question</p>;
+  }
 }
