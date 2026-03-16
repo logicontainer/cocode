@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Question, questionNoIdSchema } from "@/types/api";
 
+import { emitter } from "@/lib/eventEmitter";
 import { prisma } from "@/lib/prisma";
-import z from "zod";
 
 export async function POST(
   req: NextRequest,
@@ -43,10 +43,14 @@ export async function POST(
         language: question.language ?? null,
         session: { connect: { id: sid } },
       },
-      select: { id: true },
+      select: { id: true, createdAt: true },
     });
 
     console.log(`Added question with id ${created.id} to session ${sid}`);
+    emitter.emit(`update:${session.code}`, {
+      message: "createdQuestion",
+      createdAt: created.createdAt,
+    });
 
     return NextResponse.json({ id: created.id }, { status: 201 });
   } catch (error) {

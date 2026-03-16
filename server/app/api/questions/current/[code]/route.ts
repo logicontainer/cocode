@@ -26,9 +26,6 @@ export async function GET(
       orderBy: {
         createdAt: "desc",
       },
-      select: {
-        id: true,
-      },
     });
 
     if (!latestQuestion) {
@@ -38,7 +35,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ id: latestQuestion.id }, { status: 200 });
+    return NextResponse.json(latestQuestion, { status: 200 });
   } catch (error) {
     console.error("questions/current GET error", error);
     const message =

@@ -23,6 +23,8 @@ export default function IDE({
   const constrainedInstanceRef = useRef<any>(null);
 
   // Calculate the immutable line counts
+  console.log("question in ide")
+  console.log(question)
   const initialTotalLines = question.content.split(/\r?\n/).length;
   const fromLine = Math.min(question.fromLine || 1, initialTotalLines);
   const toLine = Math.min(question.toLine || 2, initialTotalLines + 1);
