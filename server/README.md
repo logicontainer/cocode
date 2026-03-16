@@ -16,21 +16,38 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# Application Deployment Guide
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Welcome to the self-hosted deployment guide. This application is distributed as a set of Docker containers. It is stateless, with all persistent data stored in a PostgreSQL database.
 
-## Learn More
+## System Requirements
 
-To learn more about Next.js, take a look at the following resources:
+* Docker and Docker Compose (v2) installed.
+* Outbound internet access (to pull images from `ghcr.io`).
+* Port `3000` available (configurable).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deployment Instructions
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **Clone or Extract:** Place these files in your desired installation directory (e.g., `/opt/cocode-app`).
+2. **Environment Setup:** * Copy the example environment file: `cp .env.example .env`
+   * Open `.env` in a text editor and update the security secrets and passwords.
+3. **Start the Application:**
+   * Run `docker compose up -d`
+   * The application will pull the latest images, apply necessary database migrations automatically, and start.
 
-## Deploy on Vercel
+## Architecture & "Bring Your Own Database" (BYODB)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+By default, the provided `docker-compose.yml` includes a PostgreSQL container (`db`) with a persistent Docker volume (`pgdata`).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+If your institution prefers to use an existing managed PostgreSQL cluster:
+
+1. Open `docker-compose.yml`.
+2. Delete or comment out the `db` service block and the `volumes` block at the bottom.
+3. Remove the `depends_on: - db` array from the `web` service.
+4. Open your `.env` file and change the `DATABASE_URL` variable to point to your institution's PostgreSQL connection string.
+
+## Automated Updates
+
+This stack includes `Watchtower`, which is configured to check our registry every hour for critical patches or updates. When an update is found, it will gracefully restart the `web` container. No manual intervention is required for database schema migrations; the application handles them automatically on boot.
+
+If you prefer to manage updates manually, simply remove the `watchtower` service from the `docker-compose.yml` file and run `docker compose pull && docker compose up -d` when you wish to update.
