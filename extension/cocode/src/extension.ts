@@ -5,7 +5,6 @@ import * as vscode from "vscode";
 import { Answer, Question, QuestionPostResult, Session } from "./types";
 
 import { EventSource } from "eventsource";
-import { QuestionManager } from "./questions";
 import { ViewProvider } from "./providers/view-provider";
 import { isInSession, isTakingSuggestions, StateMachineHandler } from "./statemachine";
 import { EditorHandler } from "./editor-handler";
@@ -53,11 +52,16 @@ export async function activate(context: vscode.ExtensionContext) {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(question),
+          body: JSON.stringify({
+            ...question,
+            fromLine: question.range.fromLine,
+            toLine: question.range.toLine,
+          }),
         });
 
-        const { id } = (await res.json()) as QuestionPostResult;
-        stateMachineHandler.handleServerQuestionLoaded(id)
+        const { id: questionId } = (await res.json()) as QuestionPostResult;
+        stateMachineHandler.handleServerQuestionLoaded(questionId)
+        subscribeToAnswers(sessionId, questionId);
       },
       onDeleteSuggestion: (sessionId, questionId, suggId) => {
         fetch(`${baseUrl}/api/sessions/${sessionId}/questions/${questionId}/answers/${suggId}`, {
@@ -76,7 +80,7 @@ export async function activate(context: vscode.ExtensionContext) {
     },
   })
 
-  const onChooseAnswerInPanel = (id: number | null) => {
+  const onChooseAnswerInPanel = (id: Answer["id"] | null) => {
     stateMachineHandler.editorSelectSuggestion(id)
   };
 
@@ -115,25 +119,17 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const { session, question } = state
 
-    fetch(`${baseUrl}/api/sessions/${sessionId}/questions/${question.id}/answers`)
-      .then((res) => {
-        return res.json();
-      })
-      .then((answers: Answer[]) => {
-        sidepanelViewProvider.updateAnswers(answers);
-      })
-      .catch((err) => {
-        console.error(err);
-      });
+    const res = await fetch(`${baseUrl}/api/sessions/${session.id}/questions/${question.id}/answers`)
+    const answers: Answer[] = (await res.json()) as Answer[]
+    stateMachineHandler.handleServerSuggestionsUpdated(answers)
   };
 
   function subscribeToAnswers(sid: string, qid: string) {
     const url = `${baseUrl}/api/events/sessions/${sid}/questions/${qid}/answers`;
     const sse = new EventSource(url);
-
     // Listen for the custom 'answer-to-question' event we defined in our Next.js stream
     const eventId = `answer-to-question:${qid}`;
-    sse.addEventListener(eventId, async (event) => {
+    sse.addEventListener(eventId, async _ => {
       apiPollAnswers().catch((err) => {
         console.error(err);
       });
@@ -157,6 +153,12 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand("cocode.postQuestion", () => {
       const editor = vscode.window.activeTextEditor;
+      const state = stateMachineHandler.currentState()
+
+      if (!isInSession(state)) {
+        vscode.window.showWarningMessage("No active session.");
+        return;
+      }
 
       if (!editor) {
         vscode.window.showWarningMessage("No active file.");
@@ -178,25 +180,6 @@ export async function activate(context: vscode.ExtensionContext) {
       } satisfies Omit<Question, "id">
 
       stateMachineHandler.editorPoseQuestion(question)
-      if (questionManager.getActiveQuestion()) {
-        vscode.window.showWarningMessage(
-          "There is an active unanswered question",
-        );
-        if (callback) {
-          callback(false);
-        }
-        return;
-      }
-
-      await questionManager.startQuestion(editor);
-      subscribeToAnswers(
-        context.workspaceState.get("cocodeSessionId", null) || "",
-        questionManager.getActiveQuestion()!.id,
-      );
-      sidepanelViewProvider.updateQuestion(questionManager.getActiveQuestion());
-      if (callback) {
-        callback(true);
-      }
     }),
   );
 
@@ -213,7 +196,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('cocode.deleteSuggestion', (id: number) => {
+    vscode.commands.registerCommand('cocode.deleteSuggestion', (id: Answer["id"]) => {
       stateMachineHandler.editorDeleteSuggestion(id)
     })
   );

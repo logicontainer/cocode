@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { Answer, Question } from '../types';
+import { Answer } from '../types';
 import { State } from '../statemachine';
 
 export class ViewProvider implements vscode.WebviewViewProvider {
@@ -10,14 +10,14 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   private cocodeBaseUrl: string;
   private jsFileContents: string
 
-  private onChooseAnswer: (id: number | null) => void; // id = null means unselecting chosen answer
+  private onChooseAnswer: (id: Answer["id"] | null) => void; // id = null means unselecting chosen answer
   private requestUIUpdate: () => void
 
   constructor(
     htmlPath: string,
     jsPath: string,
     extensionUri: vscode.Uri, 
-    onChooseAnswer: (id: number | null) => void,
+    onChooseAnswer: (id: Answer["id"] | null) => void,
     cocodeBaseUrl: string,
     requestUIUpdate: () => void,
   ) {

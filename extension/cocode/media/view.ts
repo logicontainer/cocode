@@ -61,7 +61,9 @@ for (const [selector, func] of Object.entries(buttonListeners)) {
 //
 //
 
-function chooseAnswer(id: number | null) { vscode.postMessage({ command: 'chooseAnswer', id }) }
+function chooseAnswer(id: Answer["id"] | null) { 
+  vscode.postMessage({ command: 'chooseAnswer', id }) 
+}
 
 function disableStartSessionButton() {
   const btn = document.getElementById('start-session-btn')!;
@@ -87,24 +89,19 @@ function disablePostQuestionButton() {
   btn.textContent = "Loading...";
 }
 
-
-
 function setSessionCodeValue(code: number | null) {
   const element = document.querySelector<HTMLLinkElement>('#session-code-value')!;
   element.textContent = code?.toString() ?? "NULL";
   element.href = `${COCODE_BASE_URL}/answer?code=${code}`;
 }
 
-
 window.addEventListener("message", (event) => {
   const { command, ...data } = event.data;
 
-  const startSessionBtn = document.getElementById('start-session-btn')!;
-  const postQuestionBtn = document.getElementById('post-question-btn')!;
   if (command === 'updateState') {
     const state = data.state as State
 
-    // CLEAN up
+    // TODO: CLEAN up
     document.querySelector<HTMLButtonElement>('#post-question-btn')!.disabled = true
     document.querySelector<HTMLButtonElement>('#accept-answer-btn')!.disabled = true
     document.querySelector<HTMLButtonElement>('#reject-answer-btn')!.disabled = true
@@ -157,6 +154,11 @@ window.addEventListener("message", (event) => {
         const elements = state.suggestions.map(answer => {
           const elm: HTMLElement = document.querySelector<HTMLTemplateElement>('#answer-template')!.content.firstElementChild!.cloneNode(true) as HTMLElement
           elm.id = `answer-${answer.id}`
+
+          if (answer.id === state.selectedSuggestionId) {
+            elm.classList.add('chosen');
+          }
+
           const codeElement = elm.querySelector('.answer-code')!;
           codeElement.textContent = trimAnswer(answer.text);
           codeElement.classList.add(`language-${state.question.language}`);

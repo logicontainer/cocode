@@ -97,11 +97,30 @@ type StateMachine = {
 // }
 
 export function isInSession(state: State) {
-  return state.enum.includes('in session')
+  return 'in session, idle' === state.enum ||
+         'in session, loading question' === state.enum ||
+         'in session, taking suggestions' === state.enum
+
 }
 
 export function isTakingSuggestions(state: State) {
   return state.enum === "in session, taking suggestions"
+}
+
+export function getQuestionOriginalRangeContent(state: State & { enum: 'in session, taking suggestions' }): string {
+  return state.question.content
+    .split('\n')
+    .slice(state.question.range.fromLine - 1, state.question.range.toLine - 1)
+    .join('\n')
+}
+
+export function getCurrentSuggestion(state: State): Answer | null {
+  if (state.enum !== "in session, taking suggestions" || state.selectedSuggestionId === null) {
+    return null;
+  }
+
+  const sugg = state.suggestions.find(sugg => sugg.id === state.selectedSuggestionId)
+  return sugg ?? null
 }
 
 export interface StateMachineObserver {
@@ -223,10 +242,11 @@ export class StateMachineHandler {
           }
         },
 
-        'EDITOR: select suggestion': (state, trans) => {
+        'EDITOR: select suggestion': (state, { suggId }) => {
+          const { selectedSuggestionId } = state
           return {
             ...state,
-            selectedSuggestionId: trans.suggId
+            selectedSuggestionId: suggId === selectedSuggestionId ? null : suggId
           };
         },
 

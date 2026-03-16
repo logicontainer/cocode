@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { getUpdatedRanges } from 'vscode-position-tracking';
-import { State } from './statemachine';
+import { getQuestionOriginalRangeContent, getCurrentSuggestion as getSelectedSuggestion, isTakingSuggestions, State } from './statemachine';
 import { Range } from './types';
 
 class DynamicRange {
@@ -131,11 +131,50 @@ export class EditorHandler {
         this.decorationHandler.clear(this.editor.document);
         break;
 
-      case 'in session, loading question': case 'in session, taking suggestions':
-        const range = rangeToVsCodeRange(this.editor.document, state.question.range) 
-        this.handleRangeChanged(range)
+      case 'in session, loading question': 
+        this.handleRangeChanged(rangeToVsCodeRange(this.editor.document, state.question.range))
+        break;
+
+      case 'in session, taking suggestions':
+        this.updateAnswerPortion(state)
+        this.handleRangeChanged(rangeToVsCodeRange(this.editor.document, state.question.range))
         break;
     }
+  }
+
+  private updateAnswerPortion(state: State & { enum: 'in session, taking suggestions' }) {
+    const replacement = getSelectedSuggestion(state)?.text ?? getQuestionOriginalRangeContent(state)
+
+    const range = this.dynamicRange?.getCurrentRange()!
+    this.editor.edit(editBuilder => {
+      if (!isTakingSuggestions(state)) {
+          vscode.window.showErrorMessage("No question has been asked")
+          return;
+      }
+      this.decorationHandler.clear(this.editor.document)
+      this.dynamicRange = null
+      editBuilder.replace(range, replacement);
+    }).then(success => {
+        if (success) {       
+            const lines = replacement.split(/\r?\n/);
+            const lineCount = lines.length;
+            const lastLineLength = lines[lineCount - 1].length;
+
+            // The new start is the same as the old start (beginning of the line)
+            const newStart = range.start;
+
+            // The new end line is (startLine + number of new lines added)
+            // The character is the length of that final string segment
+            const newEnd = new vscode.Position(
+                newStart.line + lineCount - 1,
+                lastLineLength
+            );         
+
+            this.handleRangeChanged(new vscode.Range(newStart, newEnd))
+        } else {
+            vscode.window.showErrorMessage("Failed to apply the code change.");
+        }
+    });
   }
 
   getSelectedRange() {
