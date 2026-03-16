@@ -108,25 +108,24 @@ export interface StateMachineObserver {
   onStateUpdate: (state: State) => void
 }
 
+export interface ApiStrategy {
+  onCreateSession: () => void;
+  onPoseQuestion: (sessionId: Session["id"], question: Omit<Question, "id">) => void;
+  onDeleteSuggestion: (sessionId: Session["id"], questinoId: Question["id"], suggId: Answer["id"]) => void;
+}
+
 export class StateMachineHandler {
-  private onCreateSession: () => void
-  private onPoseQuestion: (sessionId: Session["id"], question: Omit<Question, "id">) => void
-  private onDeleteSuggestion: (sessionId: Session["id"], questionId: Question["id"], suggId: Answer["id"]) => void
+  private apiStrategy: ApiStrategy
 
   private state_: State
   private observers: StateMachineObserver[]
 
   constructor(
     initialState: State,
-    // this should be a strategy pattern
-    onCreateSession: () => void, 
-    onPoseQuestion: (sessionId: Session["id"], question: Omit<Question, "id">) => void,
-    onDeleteSuggestion: (sessionId: Session["id"], questionId: Question["id"], suggId: Answer["id"]) => void,
+    apiStrategy: ApiStrategy
   ) {
     this.state_ = initialState
-    this.onCreateSession = onCreateSession;
-    this.onPoseQuestion = onPoseQuestion;
-    this.onDeleteSuggestion = onDeleteSuggestion
+    this.apiStrategy = apiStrategy
     this.observers = [];
   }
 
@@ -141,7 +140,7 @@ export class StateMachineHandler {
   forceUpdate() { return this.notifyStateUpdate() }
 
   editorCreateSession() { this.doTransition({ enum: 'EDITOR: create session' }) }
-  editorRejoinSession(session: Session) { this.doTransition({ enum: 'EDITOR: rejoin session' }) }
+  editorRejoinSession() { this.doTransition({ enum: 'EDITOR: rejoin session' }) }
   editorPoseQuestion(question: Omit<Question, "id">) { this.doTransition({ enum: 'EDITOR: pose question', question }) }
   editorModifyQuestion(question: Omit<Question, "id">) { this.doTransition({ enum: 'EDITOR: modify question', newQuestion: question })}
   editorSelectSuggestion(suggId: Answer["id"] | null) { this.doTransition({ enum: 'EDITOR: select suggestion', suggId }) }
@@ -157,7 +156,7 @@ export class StateMachineHandler {
     const stateMachine: StateMachine = {
       'no session': {
         'EDITOR: create session': () => {
-          this.onCreateSession();
+          this.apiStrategy.onCreateSession();
           return { enum: 'creating session' }
         },
         'EDITOR: rejoin session': (state, _) => {
@@ -184,7 +183,7 @@ export class StateMachineHandler {
 
       'in session, idle': {
         'EDITOR: pose question': (state, { question }) => {
-          this.onPoseQuestion(state.session.id, question)
+          this.apiStrategy.onPoseQuestion(state.session.id, question)
           return {
             ...state,
             enum: 'in session, loading question',
@@ -232,7 +231,7 @@ export class StateMachineHandler {
         },
 
         'EDITOR: delete suggestion': (state, { suggId }) => {
-          this.onDeleteSuggestion(state.session.id, state.question.id, suggId)
+          this.apiStrategy.onDeleteSuggestion(state.session.id, state.question.id, suggId)
           return {
             ...state,
             deletedSuggestionIds: [suggId, ...state.deletedSuggestionIds],
