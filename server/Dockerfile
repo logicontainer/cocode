@@ -46,10 +46,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Copy the Prisma folder so we can run database migrations on startup
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./
 
 USER nextjs
 EXPOSE 3000
 ENV PORT 3000
 
-# Run database migrations, THEN start the Next.js server
 CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
