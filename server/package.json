@@ -48,8 +48,11 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "unrs-resolver",
-      "sharp"
+      "@prisma/engines",
+      "msw",
+      "prisma",
+      "sharp",
+      "unrs-resolver"
     ]
   }
 }

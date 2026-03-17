@@ -49,7 +49,6 @@ export async function POST(
 
 
     const eventId = `answer-to-question:${question.id}`
-    console.log(eventId)
     emitter.emit(eventId, {
       message: "createdAnswer",
       createdAt: created.createdAt,

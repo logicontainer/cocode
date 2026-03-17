@@ -54,7 +54,6 @@ export default function Answer({
       });
   };
   const handleReset = () => {
-    console.log("Handle reset");
     setUserAnswer(unchangedEditableInput);
     setResetKey((key) => key + 1);
   };

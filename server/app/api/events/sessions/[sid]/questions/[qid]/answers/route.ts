@@ -8,7 +8,6 @@ export async function GET(
   { params }: { params: Promise<{ sid: string; qid: string }> },
 ) {
   const { sid, qid } = await params;
-  console.log(`GET event sessions questions answers ${sid}, ${qid}`)
   let controller: ReadableStreamDefaultController;
 
   const stream = new ReadableStream({
@@ -25,7 +24,6 @@ export async function GET(
 
       // 2. Define the callback that fires when an answer arrives
       const onUpdate = (data: any) => {
-        console.log("on update")
         const payload = JSON.stringify(data);
         controller.enqueue(
           encoder.encode(`event: answer-to-question:${qid}\ndata: ${payload}\n\n`),

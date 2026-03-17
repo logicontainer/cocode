@@ -1,8 +1,10 @@
 // app/actions.ts
 "use server";
+"force-dynamic";
 
 import { emitter } from "@/lib/eventEmitter";
 import { prisma } from "@/lib/prisma";
+import { after } from "next/server";
 
 export async function saveAnswerAction(text: string, questionId: string) {
   try {
@@ -28,10 +30,11 @@ export async function saveAnswerAction(text: string, questionId: string) {
     });
 
     const eventId = `answer-to-question:${question.id}`
-    console.log(eventId)
-    emitter.emit(eventId, {
-      message: "createdAnswer",
-      createdAt: created.createdAt,
+    after(() => {
+      emitter.emit(eventId, {
+        message: "createdAnswer",
+        createdAt: created.createdAt,
+      })
     })
 
     return { success: true, data: created };
