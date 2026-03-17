@@ -1,4 +1,3 @@
-import * as dotenv from "dotenv";
 import * as path from "path";
 import * as vscode from "vscode";
 
@@ -207,6 +206,12 @@ export async function activate(context: vscode.ExtensionContext) {
       stateMachineHandler.editorDeleteSuggestion(id)
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("cocode.endSession", () => {
+      stateMachineHandler.editorEndSession()
+    })
+  )
 }
 
 export function deactivate() { }
