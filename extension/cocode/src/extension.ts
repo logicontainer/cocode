@@ -38,7 +38,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const stateMachineHandler = new StateMachineHandler(
     { enum: 'no session', rejoinableSession: (oldSessionExists ? { id: previousId, code: previousCode } : null) },
     {
-      onCreateSession: async () => {
+      onApiCreateSession: async () => {
         // call end point to get code, and sessionid
         const result = await fetch(`${baseUrl}/api/sessions`, {
           method: "POST",
@@ -52,7 +52,7 @@ export async function activate(context: vscode.ExtensionContext) {
         context.workspaceState.update("cocodeSessionCode", session.code)
         stateMachineHandler.handleServerSessionCreated(session)
       },
-      onPoseQuestion: async (sessionId, question) => {
+      onApiPoseQuestion: async (sessionId, question) => {
         const res = await fetch(`${baseUrl}/api/sessions/${sessionId}/questions`, {
           method: "POST",
           headers: {
@@ -69,11 +69,15 @@ export async function activate(context: vscode.ExtensionContext) {
         subscribeToAnswers(sessionId, questionId);
         stateMachineHandler.handleServerQuestionLoaded(questionId)
       },
-      onDeleteSuggestion: (sessionId, questionId, suggId) => {
+      onApiDeleteSuggestion: (sessionId, questionId, suggId) => {
         fetch(`${baseUrl}/api/sessions/${sessionId}/questions/${questionId}/answers/${suggId}`, {
           method: "DELETE"
         });
       },
+      onEditorReplaceContent: async (range, content) => {
+        await documentHandler?.replaceContent(range, content)
+        stateMachineHandler.editorReplacedContent()
+      }
     }
   )
 
@@ -82,11 +86,11 @@ export async function activate(context: vscode.ExtensionContext) {
     onStateUpdate: state => {
       setInSessionBool(isInSession(state))
       sidepanelViewProvider.updateView(state)
-      editorHandler?.updateEditor(state)
+      documentHandler?.updateEditor(state)
     },
   })
 
-  const onChooseAnswerInPanel = (id: Answer["id"] | null) => {
+  const onChooseAnswerInPanel = (id: Answer["id"]) => {
     stateMachineHandler.editorSelectSuggestion(id)
   };
 
@@ -116,7 +120,7 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
   );
 
-  let editorHandler: DocumentHandler | null = null
+  let documentHandler: DocumentHandler | null = null
 
   const apiPollAnswers = async () => {
     const state = stateMachineHandler.currentState()
@@ -171,9 +175,9 @@ export async function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      editorHandler = DocumentHandler.fromEditor(editor)
+      documentHandler = DocumentHandler.fromEditor(editor, r => stateMachineHandler.editorModifyRange(r))
 
-      const range = editorHandler.getSelectedRange()
+      const range = documentHandler.getSelectedRange()
       if (!range) {
         console.assert(false, "This should be impossible")
         return;
@@ -181,7 +185,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
       const question = {
         range: range,
-        content: editorHandler.getFullEditorContent(),
+        content: documentHandler.getFullEditorContent(),
         language: editor.document.languageId,
       } satisfies Omit<Question, "id">
 
