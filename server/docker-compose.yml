@@ -1,11 +1,11 @@
 services:
   web:
     # Replace with your actual GitHub Container Registry path
-    image: ghcr.io/logicontainer/cocode:latest 
+    # image: ghcr.io/logicontainer/cocode:latest
     container_name: cocode-app
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:3000"
+      - "3000:3000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
@@ -15,6 +15,9 @@ services:
       - db
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+    build:
+      context: . # Tells Docker where the code is
+      dockerfile: Dockerfile # Tells Docker which file to use
 
   db:
     image: postgres:15-alpine
