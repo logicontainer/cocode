@@ -23,10 +23,6 @@ export default async function Page({
       orderBy: { createdAt: "desc" },
     });
 
-    if (!latestQuestion) {
-      return <p>No question found for code {code}</p>;
-    }
-
     return <RealtimeAnswer code={code} initialQuestion={latestQuestion} />;
   } catch (error) {
     console.error("Error fetching latest question by code:", error);

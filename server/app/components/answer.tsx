@@ -69,7 +69,7 @@ export default function Answer({
       />
       <div className="flex items-center justify-center h-[calc(100vh-80px)] w-full">
         <div className="border border-zinc-100 rounded-xl overflow-hidden w-full h-full shadow-[0_8px_30px_rgb(0,0,0,0.08)] bg-white">
-          <p className="p-4 text-slate-400 text-center">
+          <p className="p-4 text-slate-400 text-center border-b">
             Edit the code below and submit when you're done.
           </p>
           {question ? (
@@ -80,7 +80,9 @@ export default function Answer({
             />
           ) : (
             <div className="w-full h-full flex justify-center items-center">
-              Waiting for the presenter to post a question ...
+              <p className="text-slate-400">
+                Waiting for the presenter to post a question ...
+              </p>
             </div>
           )}
         </div>
