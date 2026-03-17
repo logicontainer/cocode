@@ -62,6 +62,9 @@ type Transition = (
     enum: 'EDITOR: accept selected suggestion'
   }
   | {
+    enum: 'EDITOR: end session'
+  }
+  | {
     enum: 'EDITOR: reject suggestions'
   }
 )
@@ -74,27 +77,49 @@ type FuncForStateAndTransition<
 > = 
   ((state: State & { enum: S }, t: Transition & { enum: T }) => State)
 
+type MachineBase = Record<StateEnum, any>
+
+type ValidMachine<M extends MachineBase> = {
+  [S in StateEnum]: {
+    [T in keyof M[S]]: T extends TransitionEnum ? FuncForStateAndTransition<S, T> : never
+  }
+}
+
+type RemainingMachine<M extends MachineBase> = {
+  [S in StateEnum]: {
+    [T in Exclude<TransitionEnum, keyof M[S]>]: FuncForStateAndTransition<S, T>
+  }
+}
+
+function createStateMachine<M extends MachineBase>(
+  machine: M & ValidMachine<M>
+) {
+  return machine;
+}
+
+function completeMachine<M extends MachineBase>(
+  machine: M & ValidMachine<M>,
+  remainder: RemainingMachine<M>
+): StateMachine {
+  let fullMachine = {}
+  const stateEnums: readonly StateEnum[] = Object.keys(machine) as readonly StateEnum[]
+  for (const s of stateEnums) {
+    fullMachine = {
+      ...fullMachine,
+      [s]: {
+        ...machine[s],
+        ...remainder[s]
+      }
+    }
+  }
+  return fullMachine as M & RemainingMachine<M>
+}
+
 type StateMachine = {
   [S in StateEnum]: {
-    [T in TransitionEnum]?: FuncForStateAndTransition<S, T>;
-  };
-};
-
-// const apiCreateSession = async () => {
-//   const response = await fetch("https://localhost:3000/api/sessions", { method: "POST" })
-//   const json = await response.json();
-//   return json as Session;
-// }
-//
-// const apiPoseQuestion = async (sessionId: Session["id"], question: Omit<Question, "id">) => {
-//   const res = await fetch(`http://localhost:3000/api/sessions/${sessionId}/questions`, {
-//     method: "POST",
-//     headers: { "Content-Type": "application/json", },
-//     body: JSON.stringify(question),
-//   });
-//   const { id } = (await res.json()) as QuestionPostResult;
-//   return { ...question, id } satisfies Question
-// }
+    [T in TransitionEnum]: FuncForStateAndTransition<S, T>;
+  }
+}
 
 export function isInSession(state: State) {
   return 'in session, idle' === state.enum ||
@@ -107,7 +132,7 @@ export function isTakingSuggestions(state: State) {
   return state.enum === "in session, taking suggestions"
 }
 
-export function getQuestionOriginalRangeContent(state: State & { enum: 'in session, taking suggestions' }): string {
+export function getQuestionOriginalRangeContent(state: State & { question: Omit<Question, "id"> }): string {
   return state.question.content
     .split('\n')
     .slice(state.question.range.fromLine - 1, state.question.range.toLine - 1)
@@ -132,6 +157,7 @@ export interface ApiStrategy {
   onPoseQuestion: (sessionId: Session["id"], question: Omit<Question, "id">) => void;
   onDeleteSuggestion: (sessionId: Session["id"], questinoId: Question["id"], suggId: Answer["id"]) => void;
 }
+
 
 export class StateMachineHandler {
   private apiStrategy: ApiStrategy
@@ -166,13 +192,14 @@ export class StateMachineHandler {
   editorAcceptSelectedSuggestion() { this.doTransition({ enum: 'EDITOR: accept selected suggestion' }) }
   editorRejectSuggestions() { this.doTransition({ enum: 'EDITOR: reject suggestions' }) }
   editorDeleteSuggestion(suggId: Answer["id"]) { this.doTransition({ enum: 'EDITOR: delete suggestion', suggId }) }
+  editorEndSession() { this.doTransition({ enum: 'EDITOR: end session' }) }
 
   handleServerQuestionLoaded(questionId: Question["id"]) { this.doTransition({ enum: 'SERVER: question loaded', questionId }) }
   handleServerSessionCreated(session: Session) { this.doTransition({ enum: 'SERVER: session created', session }) }
   handleServerSuggestionsUpdated(suggestions: Answer[]) { this.doTransition({ enum: 'SERVER: suggestions updated', suggestions }) }
 
   private doTransition (transition: Transition) {
-    const stateMachine: StateMachine = {
+    const happyPathStateMachine = createStateMachine({
       'no session': {
         'EDITOR: create session': () => {
           this.apiStrategy.onCreateSession();
@@ -188,7 +215,8 @@ export class StateMachineHandler {
             enum: 'in session, idle',
             session: state.rejoinableSession,
           }
-        }
+        },
+        'EDITOR: end session': ({ rejoinableSession }, _) => ({ enum: 'no session', rejoinableSession })
       },
 
       'creating session': {
@@ -197,7 +225,7 @@ export class StateMachineHandler {
             enum: 'in session, idle',
             session
           }
-        }
+        },
       },
 
       'in session, idle': {
@@ -209,6 +237,7 @@ export class StateMachineHandler {
             question,
           }
         },
+        'EDITOR: end session': ({ session }, _) => ({ enum: 'no session', rejoinableSession: session })
       },
 
       'in session, loading question': {
@@ -221,7 +250,8 @@ export class StateMachineHandler {
             selectedSuggestionId: null,
             question: { ...state.question, id: questionId }
           }
-        }
+        },
+        'EDITOR: end session': ({ session }, _) => ({ enum: 'no session', rejoinableSession: session })
       },
 
       'in session, taking suggestions': {
@@ -268,19 +298,77 @@ export class StateMachineHandler {
         'EDITOR: reject suggestions': (state, _) => {
           return { ...state, enum: 'in session, idle' }
         },
+
+        'EDITOR: end session': ({ session }, _) => ({ enum: 'no session', rejoinableSession: session })
       }
+    } as const)
+
+    function genericErrorMessage(state: State, trans: Transition) {
+      console.warn(`Not defined: '${state.enum}' + '${trans.enum}' -> ???`)
+      return state
     }
 
-    const func = stateMachine[this.state_.enum]?.[transition.enum] as | FuncForStateAndTransition<typeof this.state_.enum, typeof transition.enum> | undefined;
-    if (!func) {
-      console.warn(`Transition undefined for ${this.state_} + ${transition}`)
-      return;
-    }
+    // TODO: fill this out with actually nice error messages
+    const fullStateMachine = completeMachine(happyPathStateMachine, {
+        'in session, idle': {
+          'EDITOR: create session': genericErrorMessage,
+          "EDITOR: accept selected suggestion": genericErrorMessage,
+          "EDITOR: delete suggestion": genericErrorMessage,
+          "EDITOR: modify question": genericErrorMessage,
+          "EDITOR: reject suggestions": genericErrorMessage,
+          "EDITOR: rejoin session": genericErrorMessage,
+          "EDITOR: select suggestion": genericErrorMessage,
+          "SERVER: question loaded": genericErrorMessage,
+          "SERVER: session created": genericErrorMessage,
+          "SERVER: suggestions updated": genericErrorMessage,
+        },
+        'in session, loading question': {
+          "SERVER: suggestions updated": genericErrorMessage,
+          "SERVER: session created": genericErrorMessage,
+          "EDITOR: create session": genericErrorMessage,
+          "EDITOR: pose question": genericErrorMessage,
+          "EDITOR: select suggestion": genericErrorMessage,
+          "EDITOR: rejoin session": genericErrorMessage,
+          "EDITOR: reject suggestions": genericErrorMessage,
+          "EDITOR: modify question": genericErrorMessage,
+          "EDITOR: delete suggestion": genericErrorMessage,
+          "EDITOR: accept selected suggestion": genericErrorMessage,
+        },
+        'in session, taking suggestions': {
+          "EDITOR: rejoin session": genericErrorMessage,
+          "SERVER: session created": genericErrorMessage,
+          "SERVER: question loaded": genericErrorMessage,
+          "EDITOR: create session": genericErrorMessage,
+          "EDITOR: pose question": genericErrorMessage
+        },
+        'no session': {
+          "EDITOR: accept selected suggestion": genericErrorMessage,
+          "EDITOR: delete suggestion": genericErrorMessage,
+          "EDITOR: modify question": genericErrorMessage,
+          "EDITOR: reject suggestions": genericErrorMessage,
+          "EDITOR: select suggestion": genericErrorMessage,
+          "SERVER: question loaded": genericErrorMessage,
+          "SERVER: session created": genericErrorMessage,
+          "SERVER: suggestions updated": genericErrorMessage,
+          "EDITOR: pose question": genericErrorMessage,
+        },
+        'creating session': {
+          "EDITOR: accept selected suggestion": genericErrorMessage,
+          "EDITOR: delete suggestion": genericErrorMessage,
+          "EDITOR: modify question": genericErrorMessage,
+          "EDITOR: reject suggestions": genericErrorMessage,
+          "EDITOR: select suggestion": genericErrorMessage,
+          "SERVER: question loaded": genericErrorMessage,
+          "SERVER: suggestions updated": genericErrorMessage,
+          "EDITOR: pose question": genericErrorMessage,
+          "EDITOR: create session": genericErrorMessage,
+          "EDITOR: rejoin session": genericErrorMessage,
+          "EDITOR: end session": genericErrorMessage
+        }
+    })
 
-    const prevState = this.state_
+    const func = fullStateMachine[this.state_.enum][transition.enum] as FuncForStateAndTransition<typeof this.state_.enum, typeof transition.enum>
     this.state_ = func(this.state_, transition)
-    console.log(prevState, "+", transition, " -> ", this.state_)
-
     this.notifyStateUpdate()
   }
 

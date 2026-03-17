@@ -36,6 +36,10 @@
         "title": "CoCode: Start New Session"
       },
       {
+        "command": "cocode.endSession",
+        "title": "CoCode: End Session"
+      },
+      {
         "command": "cocode.rejoinSession",
         "title": "CoCode: Rejoin Previous Session"
       },
@@ -50,10 +54,6 @@
       {
         "command": "cocode.rejectSuggestions",
         "title": "CoCode: Reject Suggestions"
-      },
-      {
-        "command": "cocode.deleteSuggestion",
-        "title": "CoCode: Delete Suggestions"
       }
     ],
     "menus": {
