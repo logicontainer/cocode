@@ -1,18 +1,18 @@
 import * as vscode from 'vscode';
 import { getUpdatedRanges } from 'vscode-position-tracking';
-import { getQuestionOriginalRangeContent, getCurrentSuggestion as getSelectedSuggestion, isTakingSuggestions, State } from './statemachine';
+import {  State } from './statemachine';
 import { Range } from './types';
 
 class DynamicRange {
   private range_: vscode.Range | null;
-  private onRangeChanged: (newRange: vscode.Range) => void;
+  private onRangeModified: (newRange: vscode.Range) => void;
   private onRangeRemoved: () => void;
   private document_: vscode.TextDocument
 
-  constructor(range: vscode.Range, document: vscode.TextDocument, onRangeChanged: (newRange: vscode.Range) => void, onRangeRemoved: () => void) {
+  constructor(range: vscode.Range, document: vscode.TextDocument, onRangeModified: (newRange: vscode.Range) => void, onRangeRemoved: () => void) {
     this.range_ = range
     this.document_ = document
-    this.onRangeChanged = onRangeChanged;
+    this.onRangeModified = onRangeModified;
     this.onRangeRemoved = onRangeRemoved;
   }
 
@@ -48,7 +48,7 @@ class DynamicRange {
     const oldRange = this.range_
     this.range_ = updatedRanges[0]
     if (!this.range_.isEqual(oldRange)) {
-      this.onRangeChanged(this.range_)
+      this.onRangeModified(this.range_)
     }
   }
 
@@ -101,11 +101,13 @@ export class DocumentHandler {
   private document: vscode.TextDocument
   private decorationHandler: DecorationHandler = new DecorationHandler()
   private dynamicRange: DynamicRange | null = null
+  private onRangeModified: (newRange: Range) => void
 
-  constructor(document: vscode.TextDocument, selection: vscode.Selection) {
+  constructor(document: vscode.TextDocument, selection: vscode.Selection, onRangeModified: (newRange: Range) => void) {
     this.document = document
+    this.onRangeModified = onRangeModified
 
-    this.handleRangeChanged(selection)
+    this.updateRange(selection)
 
     vscode.workspace.onDidChangeTextDocument(event => {
       this.dynamicRange?.update(event)
@@ -115,7 +117,6 @@ export class DocumentHandler {
       const editor = editors.find(e => e.document.uri.toString() === this.document.uri.toString())
       if (!editor) return
       this.document = editor.document
-      this.refreshRange()
     })
     
     vscode.workspace.onDidRenameFiles(async ev => {
@@ -123,7 +124,6 @@ export class DocumentHandler {
       if (!renamedFile) { return }
 
       this.document = await vscode.workspace.openTextDocument(renamedFile.newUri)
-      this.refreshRange()
     })
 
     vscode.workspace.onDidSaveTextDocument(async document => {
@@ -133,8 +133,8 @@ export class DocumentHandler {
     })
   }
 
-  static fromEditor(editor: vscode.TextEditor) {
-    return new DocumentHandler(editor.document, editor.selection)
+  static fromEditor(editor: vscode.TextEditor, onRangeModified: (newRange: Range) => void) {
+    return new DocumentHandler(editor.document, editor.selection, onRangeModified)
   }
 
   private getActiveEditor(): vscode.TextEditor | null {
@@ -147,18 +147,24 @@ export class DocumentHandler {
     return vscode.window.showTextDocument(this.document)
   }
 
-  private refreshRange() {
-    const range = this.dynamicRange?.getCurrentRange() ?? null
-    range && this.handleRangeChanged(range)
+  private handleRangeModified(range: vscode.Range) {
+    this.onRangeModified(vsCodeRangeToRange(range))
   }
 
-  handleRangeChanged(newRange: vscode.Range) {
+  private updateRange(newRange: vscode.Range | null) {
+    this.decorationHandler.clear(this.document);
+
+    if (!newRange) {
+      this.dynamicRange = null;
+      return;
+    }
+
     this.decorationHandler.updateRange(this.document, newRange)
     this.dynamicRange = new DynamicRange(
       newRange,
       this.document,
-      this.handleRangeChanged,
-      this.handleRangeRemoved,
+      r => this.handleRangeModified(r),
+      () => this.handleRangeRemoved(),
     )
   }
 
@@ -174,52 +180,28 @@ export class DocumentHandler {
         break;
 
       case 'in session, loading question': 
-        this.handleRangeChanged(rangeToVsCodeRange(this.document, state.question.range))
+        this.updateRange(rangeToVsCodeRange(this.document, state.question.range))
         break;
 
       case 'in session, taking suggestions':
-        this.updateAnswerPortion(state)
-        this.handleRangeChanged(rangeToVsCodeRange(this.document, state.question.range))
+        this.updateRange(rangeToVsCodeRange(this.document, state.question.range))
         break;
     }
   }
 
-  private updateAnswerPortion(state: State & { enum: 'in session, taking suggestions' }) {
-    const replacement = getSelectedSuggestion(state)?.text ?? getQuestionOriginalRangeContent(state)
-
-    if (!isTakingSuggestions(state)) {
-        vscode.window.showErrorMessage("No question has been asked")
-        return;
-    }
-
-    const range = rangeToVsCodeRange(this.document, state.question.range)
-
-    this.getOrCreateActiveEditor().then(editor =>
+  // calling this function will mean tracking of ranges will stop until
+  //   the next time this.updateEditor is called
+  async replaceContent(range: Range, content: string): Promise<void> {
+    return this.getOrCreateActiveEditor().then(editor =>
       editor.edit(editBuilder => {
-        this.decorationHandler.clear(this.document)
-        this.dynamicRange = null
-        editBuilder.replace(range, replacement);
+        editBuilder.replace(rangeToVsCodeRange(editor.document, range), content);
+      }).then(success => {
+        if (!success) {
+          vscode.window.showErrorMessage("Wasn't able to replace text.")
+          return;
+        }
       })
-    ).then(success => {
-      if (success) {       
-        const lines = replacement.split(/\r?\n/);
-        const lineCount = lines.length;
-        const lastLineLength = lines[lineCount - 1].length;
-
-        // The new start is the same as the old start (beginning of the line)
-        const newStart = range.start;
-
-        // The new end line is (startLine + number of new lines added)
-        // The character is the length of that final string segment
-        const newEnd = new vscode.Position(
-          newStart.line + lineCount - 1,
-          lastLineLength
-        );
-        this.handleRangeChanged(new vscode.Range(newStart, newEnd))
-      } else {
-        vscode.window.showErrorMessage("Failed to apply the code change.");
-      }
-    })
+    )
   }
 
   getSelectedRange() {
