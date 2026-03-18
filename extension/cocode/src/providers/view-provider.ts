@@ -7,10 +7,10 @@ export type ViewProviderState = State & { suggestionsVisible: boolean }
 
 export class ViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
-  private html: string;
+  private htmlPath: string;
+  private jsPath: string
   private cocodeBaseUrl: string;
   private extensionContext: vscode.ExtensionContext
-  private jsFileContents: string
   private prevState_: State | null = null
 
   private onChooseAnswer: (id: Answer["id"] | null) => void; // id = null means unselecting chosen answer
@@ -26,52 +26,17 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   ) {
     this.extensionContext = extensionContext
     this.requestUIUpdate = requestUIUpdate
-    this.html = fs.readFileSync(htmlPath, 'utf-8');
-    this.jsFileContents = fs.readFileSync(jsPath, 'utf-8')
-      .split('\n')
-      .filter(l => !l.includes('Object.defineProperty(exports') && !l.includes('use strict')) // remove stuff that tsc generates
-      .join('\n');
+    this.htmlPath = htmlPath
+    this.jsPath = jsPath
     this.onChooseAnswer = onChooseAnswer;
     this.cocodeBaseUrl = cocodeBaseUrl;
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView) {
     this._view = webviewView;
-
-    const codiconsUri = webviewView.webview.asWebviewUri(
-      vscode.Uri.joinPath(
-        this.extensionContext.extensionUri,
-        "node_modules",
-        "@vscode/codicons",
-        "dist",
-        "codicon.css",
-      ),
-    );
-
-    let codeCompletionStylesheet = null;
-    if (vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark) {
-      codeCompletionStylesheet = "atom-one-dark";
-    } else if (
-      vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Light
-    ) {
-      codeCompletionStylesheet = "atom-one-light";
-    } else {
-      codeCompletionStylesheet = "atom-one-dark";
-    }
-
+    
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = this._getHtml()
-      .replaceAll("{{CODEICONS_URI_MAGICAL_STRING}}", codiconsUri.toString())
-      .replaceAll(
-        "{{CODE_COMPLETION_STYLESHEET_MAGICAL_STRING}}",
-        codeCompletionStylesheet,
-      )
-      .replaceAll("{{COCODE_BASE_URL}}", this.cocodeBaseUrl)
-      .replaceAll(
-        "{{COCODE_BASE_SHORT_URL}}",
-        this.cocodeBaseUrl.replaceAll("https://", "").replaceAll("http://", ""),
-      )
-      .replaceAll("{{COCODE_VIEWJS_FILE_CONTENTS}}", this.jsFileContents);
 
     // Handle messages sent from the webview
     webviewView.webview.onDidReceiveMessage(({ command, ...data }) => {
@@ -117,6 +82,49 @@ export class ViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _getHtml(): string {
-    return this.html;
+    if(!this._view) {
+      return ""
+    }
+
+    const htmlFileContents = fs.readFileSync(this.htmlPath, 'utf-8');
+    const jsFileContents = fs.readFileSync(this.jsPath, 'utf-8')
+      .split('\n')
+      .filter(l => !l.includes('Object.defineProperty(exports') && !l.includes('use strict')) // remove stuff that tsc generates
+      .join('\n');
+
+    const codiconsUri = this._view.webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this.extensionContext.extensionUri,
+        "node_modules",
+        "@vscode/codicons",
+        "dist",
+        "codicon.css",
+      ),
+    );
+
+    let codeCompletionStylesheet = null;
+    if (vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark) {
+      codeCompletionStylesheet = "atom-one-dark";
+    } else if (
+      vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Light
+    ) {
+      codeCompletionStylesheet = "atom-one-light";
+    } else {
+      codeCompletionStylesheet = "atom-one-dark";
+    }
+
+    const html = htmlFileContents.replaceAll("{{CODEICONS_URI_MAGICAL_STRING}}", codiconsUri.toString())
+      .replaceAll(
+        "{{CODE_COMPLETION_STYLESHEET_MAGICAL_STRING}}",
+        codeCompletionStylesheet,
+      )
+      .replaceAll("{{COCODE_BASE_URL}}", this.cocodeBaseUrl)
+      .replaceAll(
+        "{{COCODE_BASE_SHORT_URL}}",
+        this.cocodeBaseUrl.replaceAll("https://", "").replaceAll("http://", ""),
+      )
+      .replaceAll("{{COCODE_VIEWJS_FILE_CONTENTS}}", jsFileContents);
+
+    return html;
   }
 }

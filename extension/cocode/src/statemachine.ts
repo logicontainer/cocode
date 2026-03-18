@@ -208,7 +208,7 @@ export class StateMachineHandler {
   handleServerSessionCreated(session: Session) { this.doTransition({ enum: 'SERVER: session created', session }) }
   handleServerSuggestionsUpdated(suggestions: Answer[]) { this.doTransition({ enum: 'SERVER: suggestions updated', suggestions }) }
 
-  private doTransition (transition: Transition) {
+  private fullStateMachine() {
     const happyPathStateMachine = createStateMachine({
       'no session': {
         'EDITOR: create session': () => {
@@ -220,7 +220,7 @@ export class StateMachineHandler {
             console.error("No rejoinable session")
             return state;
           }
-
+  
           return {
             enum: 'in session, idle',
             session: state.rejoinableSession,
@@ -228,7 +228,7 @@ export class StateMachineHandler {
         },
         'EDITOR: end session': ({ rejoinableSession }, _) => ({ enum: 'no session', rejoinableSession })
       },
-
+  
       'creating session': {
         'SERVER: session created': (_, { session }) => {
           return {
@@ -237,7 +237,7 @@ export class StateMachineHandler {
           }
         },
       },
-
+  
       'in session, idle': {
         'EDITOR: pose question': (state, { question }) => {
           this.apiStrategy.onApiPoseQuestion(state.session.id, question)
@@ -249,7 +249,7 @@ export class StateMachineHandler {
         },
         'EDITOR: end session': ({ session }, _) => ({ enum: 'no session', rejoinableSession: session })
       },
-
+  
       'in session, loading question': {
         'SERVER: question loaded': (state, { questionId }) => {
           return {
@@ -264,7 +264,7 @@ export class StateMachineHandler {
         },
         'EDITOR: end session': ({ session }, _) => ({ enum: 'no session', rejoinableSession: session })
       },
-
+  
       'in session, taking suggestions': {
         'SERVER: suggestions updated': (state, { suggestions }) => {
           const effectiveSuggestions = suggestions.filter(sugg => !state.deletedSuggestionIds.includes(sugg.id))
@@ -276,7 +276,7 @@ export class StateMachineHandler {
             selectedSuggestionId: selectedGone ? null : state.selectedSuggestionId
           };
         },
-
+  
         'EDITOR: modify range': (state, { newRange }) => {
           return { 
             ...state, 
@@ -286,19 +286,19 @@ export class StateMachineHandler {
             }
           }
         },
-
+  
         'EDITOR: select suggestion': (state, { suggId }) => {
           const { selectedSuggestionId } = state
           const newId = (suggId === null || suggId === selectedSuggestionId) ? null : suggId
-          const newContent = (suggId && state.suggestions.find(s => s.id === newId)?.text) || getQuestionOriginalRangeContent(state)
+          const suggestion = (suggId && state.suggestions.find(s => s.id == newId))
+          const newContent = suggestion ? suggestion.text : getQuestionOriginalRangeContent(state)
           const newRange = {
             fromLine: state.question.range.fromLine,
             toLine: state.question.range.fromLine + newContent.split('\n').length
           }
-
-
+  
           this.apiStrategy.onEditorReplaceContent(state.question.range, newContent)
-
+  
           return {
             ...state,
             question: {
@@ -309,7 +309,7 @@ export class StateMachineHandler {
             enum: 'in session, editor is replacing content'
           };
         },
-
+  
         'EDITOR: delete suggestion': (state, { suggId }) => {
           this.apiStrategy.onApiDeleteSuggestion(state.session.id, state.question.id, suggId)
           return {
@@ -317,18 +317,19 @@ export class StateMachineHandler {
             deletedSuggestionIds: [suggId, ...state.deletedSuggestionIds],
           }
         },
-
+  
         'EDITOR: accept selected suggestion': (state, _) => {
           return {
             ...state,
             enum: 'in session, idle'
           };
         },
-
+  
         'EDITOR: reject suggestions': (state, _) => {
+          this.apiStrategy.onEditorReplaceContent(state.question.range, state.originalRangeContent)
           return { ...state, enum: 'in session, idle' }
         },
-
+  
         'EDITOR: end session': ({ session }, _) => ({ enum: 'no session', rejoinableSession: session })
       },
       "in session, editor is replacing content": {
@@ -340,14 +341,14 @@ export class StateMachineHandler {
         }
       }
     } as const)
-
+  
     function genericErrorMessage(state: State, trans: Transition) {
       console.warn(`Not defined: '${state.enum}' + '${trans.enum}' -> ???`)
       return state
     }
-
+  
     // TODO: fill this out with actually nice error messages
-    const fullStateMachine = completeMachine(happyPathStateMachine, {
+    return completeMachine(happyPathStateMachine, {
         'in session, idle': {
           "EDITOR: replaced content": genericErrorMessage,
           'EDITOR: create session': genericErrorMessage,
@@ -423,8 +424,10 @@ export class StateMachineHandler {
           "EDITOR: end session": genericErrorMessage
       }
     })
+  }
 
-    const func = fullStateMachine[this.state_.enum][transition.enum] as FuncForStateAndTransition<typeof this.state_.enum, typeof transition.enum>
+  private doTransition (transition: Transition) {
+    const func = this.fullStateMachine()[this.state_.enum][transition.enum] as FuncForStateAndTransition<typeof this.state_.enum, typeof transition.enum>
     this.state_ = func(this.state_, transition)
     console.log(transition, this.state_)
     this.notifyStateUpdate()

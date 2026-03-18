@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { getUpdatedRanges } from 'vscode-position-tracking';
 import {  State } from './statemachine';
 import { Range } from './types';
+import { json } from 'stream/consumers';
 
 class DynamicRange {
   private range_: vscode.Range | null;
