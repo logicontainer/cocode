@@ -23,7 +23,7 @@ export async function saveAnswerAction(text: string, questionId: string) {
 
     const created = await prisma.answer.create({
       data: {
-        text: text?.trim() || null,
+        text: text,
         question: { connect: { id: questionId } },
       },
       select: { id: true, text: true, questionId: true, createdAt: true },
