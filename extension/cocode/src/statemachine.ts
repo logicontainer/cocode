@@ -195,7 +195,9 @@ export class StateMachineHandler {
   editorRejoinSession() { this.doTransition({ enum: 'EDITOR: rejoin session' }) }
   editorPoseQuestion(question: Omit<Question, "id">) { this.doTransition({ enum: 'EDITOR: pose question', question }) }
   editorModifyRange(newRange: Range) { this.doTransition({ enum: 'EDITOR: modify range', newRange })}
-  editorSelectSuggestion(suggId: Answer["id"]) { this.doTransition({ enum: 'EDITOR: select suggestion', suggId }) }
+  editorSelectSuggestion(suggId: Answer["id"] | null) { 
+    this.doTransition({ enum: 'EDITOR: select suggestion', suggId })
+  }
   editorReplacedContent() { this.doTransition({ enum: 'EDITOR: replaced content' }) }
   editorAcceptSelectedSuggestion() { this.doTransition({ enum: 'EDITOR: accept selected suggestion' }) }
   editorRejectSuggestions() { this.doTransition({ enum: 'EDITOR: reject suggestions' }) }
@@ -287,12 +289,13 @@ export class StateMachineHandler {
 
         'EDITOR: select suggestion': (state, { suggId }) => {
           const { selectedSuggestionId } = state
-          const newId = suggId !== null || suggId === selectedSuggestionId ? null : suggId
-          const newContent = (suggId && state.suggestions.find(s => s.id === newId)!.text) || getQuestionOriginalRangeContent(state)
+          const newId = (suggId === null || suggId === selectedSuggestionId) ? null : suggId
+          const newContent = (suggId && state.suggestions.find(s => s.id === newId)?.text) || getQuestionOriginalRangeContent(state)
           const newRange = {
             fromLine: state.question.range.fromLine,
             toLine: state.question.range.fromLine + newContent.split('\n').length
           }
+
 
           this.apiStrategy.onEditorReplaceContent(state.question.range, newContent)
 

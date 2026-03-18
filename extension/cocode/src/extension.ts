@@ -90,7 +90,8 @@ export async function activate(context: vscode.ExtensionContext) {
     },
   })
 
-  const onChooseAnswerInPanel = (id: Answer["id"]) => {
+  const onChooseAnswerInPanel = (id: Answer["id"] | null) => {
+    console.log(`chose ${id}`)
     stateMachineHandler.editorSelectSuggestion(id)
   };
 
