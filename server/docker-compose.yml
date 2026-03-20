@@ -12,8 +12,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
     build:
       context: .
       dockerfile: Dockerfile
@@ -47,15 +45,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
-  # Auto-updater
-  watchtower:
-    image: containrrr/watchtower
-    container_name: university-watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 3600 --label-enable --cleanup
 
 volumes:
   pgdata:
