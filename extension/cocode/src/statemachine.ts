@@ -209,6 +209,29 @@ export class StateMachineHandler {
   handleServerSuggestionsUpdated(suggestions: Answer[]) { this.doTransition({ enum: 'SERVER: suggestions updated', suggestions }) }
 
   private static initStateMachine(apiStrategy: ApiStrategy) {
+    const changeSelectedSuggestion = (state: State & { enum: 'in session, taking suggestions' }, suggId: Answer["id"] | null): State => {
+      const { selectedSuggestionId } = state
+      const newId = (suggId === null || suggId === selectedSuggestionId) ? null : suggId
+      const suggestion = (suggId && state.suggestions.find(s => s.id == newId))
+      const newContent = suggestion ? suggestion.text : getQuestionOriginalRangeContent(state)
+      const newRange = {
+        fromLine: state.question.range.fromLine,
+        toLine: state.question.range.fromLine + newContent.split('\n').length
+      }
+
+      apiStrategy.onEditorReplaceContent(state.question.range, newContent)
+
+      return {
+        ...state,
+        question: {
+          ...state.question,
+          range: newRange
+        },
+        selectedSuggestionId: newId,
+        enum: 'in session, editor is replacing content'
+      };
+    }
+
     const happyPathStateMachine = createStateMachine({
       'no session': {
         'EDITOR: create session': () => {
@@ -288,33 +311,22 @@ export class StateMachineHandler {
         },
   
         'EDITOR: select suggestion': (state, { suggId }) => {
-          const { selectedSuggestionId } = state
-          const newId = (suggId === null || suggId === selectedSuggestionId) ? null : suggId
-          const suggestion = (suggId && state.suggestions.find(s => s.id == newId))
-          const newContent = suggestion ? suggestion.text : getQuestionOriginalRangeContent(state)
-          const newRange = {
-            fromLine: state.question.range.fromLine,
-            toLine: state.question.range.fromLine + newContent.split('\n').length
-          }
-  
-          apiStrategy.onEditorReplaceContent(state.question.range, newContent)
-  
-          return {
-            ...state,
-            question: {
-              ...state.question,
-              range: newRange
-            },
-            selectedSuggestionId: newId,
-            enum: 'in session, editor is replacing content'
-          };
+          return changeSelectedSuggestion(state, suggId)
         },
   
         'EDITOR: delete suggestion': (state, { suggId }) => {
           apiStrategy.onApiDeleteSuggestion(state.session.id, state.question.id, suggId)
-          return {
+
+          const newState: State = {
             ...state,
-            deletedSuggestionIds: [suggId, ...state.deletedSuggestionIds],
+            deletedSuggestionIds: [suggId, ...state.deletedSuggestionIds]
+          }
+
+          if (state.selectedSuggestionId === suggId) {
+            // unselect suggestion
+            return changeSelectedSuggestion(newState, null)
+          } else {
+            return newState
           }
         },
   

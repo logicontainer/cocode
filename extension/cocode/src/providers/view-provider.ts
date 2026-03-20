@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { Answer } from '../types';
 import { State } from '../statemachine';
+import { subscribe } from 'diagnostics_channel';
 
 export type ViewProviderState = State & { suggestionsVisible: boolean }
 
@@ -78,6 +79,11 @@ export class ViewProvider implements vscode.WebviewViewProvider {
       ...state,
       suggestionsVisible: this.extensionContext.workspaceState.get<boolean>("cocodeSuggestionsVisible", true)
     } satisfies ViewProviderState
+
+    if (vs.enum === 'in session, taking suggestions') {
+      vs.suggestions = vs.suggestions.filter(({ id }) => !vs.deletedSuggestionIds.includes(id))
+    }
+
     this._view?.webview.postMessage({ command: 'updateState', state: vs })
   }
 
