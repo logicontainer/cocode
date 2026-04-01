@@ -1,18 +1,9 @@
 "use client";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import IDE, { extractLineRange } from "./ide";
 
-import { Button } from "@/components/ui/button";
 import Menubar from "./menubar";
 import { QuestionModel } from "@/lib/generated/prisma/models";
-import { saveAnswerAction } from "../actions";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -50,7 +41,6 @@ export default function Answer({
       method: "POST",
       body: JSON.stringify({ text: userAnswer }),
     })
-      // saveAnswerAction(userAnswer, question.id)
       .then((res) => {
         toast.success("Your submission has been sent to the presenter.", {
           description: "Feel free to post another submission.",
