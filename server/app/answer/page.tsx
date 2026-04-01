@@ -18,7 +18,7 @@ export default async function Page({
   }
 
   try {
-    let latestQuestion = await prisma.question.findFirst({
+    const latestQuestion = await prisma.question.findFirst({
       where: { session: { code } },
       orderBy: { createdAt: "desc" },
     });

@@ -3,7 +3,21 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Spinner } from "@/components/ui/spinner";
 
-export default function Menubar({ code, hasChanges, submitting, canSubmit, onSubmit, onReset }: { code: number, hasChanges: boolean, submitting: boolean, canSubmit: boolean, onSubmit: () => void, onReset: () => void }) {
+export default function Menubar({
+  code,
+  hasChanges,
+  submitting,
+  canSubmit,
+  onSubmit,
+  onReset,
+}: {
+  code: number;
+  hasChanges: boolean;
+  submitting: boolean;
+  canSubmit: boolean;
+  onSubmit: () => void;
+  onReset: () => void;
+}) {
   const router = useRouter();
 
   const handleLeave = () => {
@@ -13,11 +27,13 @@ export default function Menubar({ code, hasChanges, submitting, canSubmit, onSub
   return (
     <div className="z-50 flex w-full justify-stretch">
       <div className="w-full flex items-center justify-between px-2 md:px-4 py-3 bg-white/90 backdrop-blur-md border border-zinc-100 rounded-md md:rounded-3xl shadow-sm">
-        <Link href="/" className="group flex items-center justify-center gap-2 cursor-pointer">
+        <Link
+          href="/"
+          className="group flex items-center justify-center gap-2 cursor-pointer"
+        >
           <img src={"/icon-cocode-3.svg"} className="w-20" />
         </Link>
         <div className="flex items-center gap-1 md:gap-2">
-
           <Button
             variant="ghost"
             className="text-gray-500 hover:text-gray-900 cursor-pointer rounded-md md:rounded-full"
@@ -45,7 +61,6 @@ export default function Menubar({ code, hasChanges, submitting, canSubmit, onSub
             {submitting ? <Spinner /> : "Submit"}
           </Button>
         </div>
-
       </div>
     </div>
   );

@@ -23,10 +23,12 @@ export async function GET(
       );
 
       // 2. Define the callback that fires when an answer arrives
-      const onUpdate = (data: any) => {
+      const onUpdate = (data: { message: string }) => {
         const payload = JSON.stringify(data);
         controller.enqueue(
-          encoder.encode(`event: answer-to-question:${qid}\ndata: ${payload}\n\n`),
+          encoder.encode(
+            `event: answer-to-question:${qid}\ndata: ${payload}\n\n`,
+          ),
         );
       };
 
